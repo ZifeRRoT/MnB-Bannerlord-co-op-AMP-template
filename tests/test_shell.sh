@@ -16,7 +16,8 @@ for path in "$REPO"/*.json; do jq -e . "$path" >/dev/null; done
 grep -Fx 'Meta.DisplayName=Mount & Blade II: Bannerlord Co-op' "$REPO/mount-and-blade2-coop.kvp" >/dev/null
 jq -e 'all(.[]; .FieldName != "steam_username") and
   any(.[]; .FieldName == "ServerPassword" and .InputType == "Password" and .IncludeInCommandLine == false) and
-  any(.[]; .FieldName == "SteamAdvertise" and .ParamFieldName == "$.steam" and .InputType == "checkbox" and .DefaultValue == "false")' \
+  any(.[]; .FieldName == "SteamAdvertise" and .ParamFieldName == "$.steam" and .InputType == "checkbox" and .DefaultValue == "false") and
+  any(.[]; .FieldName == "AcceptEULA" and .DefaultValue == "false" and .EnumValues.True == "true" and .IncludeInCommandLine == false)' \
   "$REPO/mount-and-blade2-coopconfig.json" >/dev/null
 jq -e 'any(.[]; .UpdateSourcePlatform == "Windows" and .UpdateSourceData == "powershell.exe") and
   any(.[]; .UpdateSourcePlatform == "Linux" and .UpdateSourceData == "/bin/bash") and
@@ -28,6 +29,7 @@ if grep -E 'python|base64' "$REPO/mount-and-blade2-coop.kvp" "$REPO/mount-and-bl
 grep -Fx 'App.ExecutableWin=server\engine\dotnet\dotnet.exe' "$REPO/mount-and-blade2-coop.kvp" >/dev/null
 grep -Fx 'App.ExecutableLinux=/usr/bin/env' "$REPO/mount-and-blade2-coop.kvp" >/dev/null
 if grep '^App.CommandLineArgs=' "$REPO/mount-and-blade2-coop.kvp" | grep -Eq '\.(sh|ps1|bat)'; then exit 1; fi
+sed -n 's/^App.EnvironmentVariables=//p' "$REPO/mount-and-blade2-coop.kvp" | jq -e '.DS_ACCEPT_EULA == "{{AcceptEULA}}"' >/dev/null
 pass 'AMP manifests: masked password, no username/Python/base64, requested display name'
 
 cp "$REPO/mount-and-blade2-coop.sh" "$ROOT/mount-and-blade2-coop.sh"

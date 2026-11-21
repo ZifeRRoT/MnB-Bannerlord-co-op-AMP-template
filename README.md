@@ -45,6 +45,7 @@ wineboot, wineserver, Xvfb, xauth, socat і timeout. Windows-гілка приз
 | Campaign save | Ім'я сейву без розширення: ASCII-літери, цифри, `_`, `-` |
 | Autosave minutes | Автозбереження, 1–1440 хвилин |
 | Register server in Steam | Вмикає поле steam; початково вимкнено, застосовується після Stop → Start |
+| Accept server EULA | Явне прийняття умов серверу через DS_ACCEPT_EULA; початково вимкнено |
 
 Зміни застосовуються на наступному **Start**. Server password — не Steam-пароль.
 Поле Steam username видалено. Акаунт визначається з кешу AMP; якщо старих акаунтів
@@ -62,6 +63,19 @@ Register server in Steam вмикає Steam advertising лише коли Steam 
 не створює runtime Steam-сеанс. У Docker з одним SteamCMD видимість у Steam
 не гарантована; реальну реєстрацію ще треба перевірити. Для вимкнення зніміть
 позначку й перезапустіть гру. Pre-start на обох ОС зберігає вибране true/false.
+
+### EULA без вводу в консоль
+
+Після Update прочитайте `server/EULA.md` (або EULA.txt) та `server/LICENSE.txt`
+у File Manager. Якщо погоджуєтеся, увімкніть **Accept server EULA** й виконайте
+Stop → Start. AMP передасть підтримувану сервером змінну `DS_ACCEPT_EULA=true`
+на Windows і Linux/Wine. Прийняття сервер записує сам у `data/eula.txt`; template
+цей файл не підробляє й не надсилає `yes` у stdin. Умови після оновлень можуть
+змінюватися: переглядайте їх перед Start, якщо опція залишена увімкненою.
+
+Зняття позначки вимикає автоматичне прийняття, але не видаляє раніше записаний
+сервером eula.txt. Реальний EULA-прохід установленого build ще треба перевірити;
+локальні тести перевіряють вимкнений default і передачу environment-параметра.
 
 ## Steam Guard та Update
 

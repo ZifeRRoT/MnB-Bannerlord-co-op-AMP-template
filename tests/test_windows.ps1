@@ -133,7 +133,11 @@ public static class CoopFakeSteam {
     try { Read-CoopConfig | Out-Null } catch { $jsonError = $_.Exception.Message }
     Assert-Coop ($null -ne $jsonError -and -not $jsonError.Contains('PRIVATE_PASSWORD')) 'Invalid JSON fails without logging its password'
     $kvp = [IO.File]::ReadAllText((Join-Path $repoPath 'mount-and-blade2-coop.kvp'))
-    Assert-Coop ($kvp.Contains('App.ExecutableWin=server\engine\dotnet\dotnet.exe') -and $kvp.Contains('Meta.OS=Windows, Linux')) 'Windows executable and platform declarations are present'
+    $environmentJson = [regex]::Match($kvp, '(?m)^App\.EnvironmentVariables=(.*)$').Groups[1].Value | ConvertFrom-Json
+    $settingsManifest = [IO.File]::ReadAllText((Join-Path $repoPath 'mount-and-blade2-coopconfig.json')) | ConvertFrom-Json
+    $eulaSetting = @($settingsManifest | Where-Object FieldName -eq 'AcceptEULA')
+    Assert-Coop ($kvp.Contains('App.ExecutableWin=server\engine\dotnet\dotnet.exe') -and $kvp.Contains('Meta.OS=Windows, Linux') -and
+        $environmentJson.DS_ACCEPT_EULA -ceq '{{AcceptEULA}}' -and $eulaSetting.Count -eq 1 -and $eulaSetting[0].DefaultValue -eq 'false') 'Native startup uses the optional EULA environment flag, disabled by default'
     $monitorPattern = [regex]::Match($kvp, '(?m)^App\.MonitorChildProcessName=(.*)$').Groups[1].Value.Trim().Replace('{{$EnginePort}}','7210')
     Assert-Coop (([regex]::IsMatch('"D:\AMP instance\server\engine\dotnet\dotnet.exe" TaleWorlds.Starter.DotNetCore.dll modules /dedicatedcustomserver 7210 EU 0',$monitorPattern)) -and
         ([regex]::IsMatch('../../dotnet/dotnet.exe TaleWorlds.Starter.DotNetCore.dll modules /dedicatedcustomserver 7210 EU 0',$monitorPattern))) 'Process monitor matches native Windows and Wine engine commands'

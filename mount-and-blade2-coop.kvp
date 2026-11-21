@@ -15,7 +15,7 @@ Meta.DockerBaseReadOnly=False
 Meta.ContainerPolicy=SupportedOnWindows, RecommendedOnLinux
 Meta.ContainerPolicyReason=Wine and Xvfb run inside this instance's AMP container.
 Meta.ExtraContainerPackages=[]
-Meta.ConfigVersion=9
+Meta.ConfigVersion=10
 Meta.AppConfigId=7b025c72-f27d-4fcf-bced-9b4ad2964dac
 App.DisplayName=Mount & Blade II: Bannerlord Co-op
 App.RootDir=./bannerlord-coop/
@@ -27,7 +27,7 @@ App.LinuxCommandLineArgs="BANNERLORD_USER_DIR=Z:{{$FullRootDir}}data" "COOP_DATA
 App.WindowsCommandLineArgs=TaleWorlds.Starter.DotNetCore.dll "_MODULES_*Native*SandBoxCore*Sandbox*{{CoopModuleId}}*DedicatedServer.Windows*_MODULES_" /dedicatedcustomserver {{$EnginePort}} EU 0
 App.CommandLineArgs={{$PlatformArgs}}
 App.UseLinuxIOREDIR=False
-App.EnvironmentVariables={"WINEPREFIX":"{{$FullRootDir}}.wine","WINEARCH":"win64","WINEDEBUG":"-all","WINEDLLOVERRIDES":"mscoree,mshtml=","BANNERLORD_USER_DIR":"{{$FullRootDir}}data","COOP_DATA_DIR":"{{$FullRootDir}}data","DOTNET_ROOT":"{{$FullRootDir}}server/engine/dotnet","DOTNET_MULTILEVEL_LOOKUP":"0"}
+App.EnvironmentVariables={"WINEPREFIX":"{{$FullRootDir}}.wine","WINEARCH":"win64","WINEDEBUG":"-all","WINEDLLOVERRIDES":"mscoree,mshtml=","BANNERLORD_USER_DIR":"{{$FullRootDir}}data","COOP_DATA_DIR":"{{$FullRootDir}}data","DOTNET_ROOT":"{{$FullRootDir}}server/engine/dotnet","DOTNET_MULTILEVEL_LOOKUP":"0","DS_ACCEPT_EULA":"{{AcceptEULA}}"}
 App.AppSettings={"CoopModuleId":"Coop"}
 App.ExitMethod=String
 App.ExitString=stop
