@@ -1,0 +1,13 @@
+.research/
+__pycache__/
+*.pyc
+.env
+runtime/
+bannerlord-coop/
+settings.json
+steam/
+.wine/
+data/
+*.vdf
+*.sav
+*.log
