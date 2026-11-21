@@ -1,6 +1,5 @@
 [
   {"DisplayName":"Server password","Category":"Co-op:stadia_controller","Subcategory":"Server:dns:1","FieldName":"ServerPassword","ParamFieldName":"$.password","InputType":"Password","DefaultValue":"","IncludeInCommandLine":false,"Description":"Password required for players to join. Empty means no password. Applied on the next Start. This is not your Steam password."},
   {"DisplayName":"Campaign save","Category":"Co-op:stadia_controller","Subcategory":"Server:dns:1","FieldName":"saveName","ParamFieldName":"$.saveName","InputType":"text","DefaultValue":"saveauto1","IncludeInCommandLine":false,"Description":"Letters, digits, _ and - only. Copy both .sav and matching .json when importing a campaign."},
-  {"DisplayName":"Autosave minutes","Category":"Co-op:stadia_controller","Subcategory":"Server:dns:1","FieldName":"autosaveMinutes","ParamFieldName":"$.autosaveMinutes","InputType":"number","DefaultValue":"5","MinValue":"1","MaxValue":"1440","IncludeInCommandLine":false},
-  {"DisplayName":"Engine region","Category":"Co-op:stadia_controller","Subcategory":"Server:dns:1","FieldName":"region","ParamFieldName":"$.region","InputType":"text","DefaultValue":"EU","IncludeInCommandLine":false}
+  {"DisplayName":"Autosave minutes","Category":"Co-op:stadia_controller","Subcategory":"Server:dns:1","FieldName":"autosaveMinutes","ParamFieldName":"$.autosaveMinutes","InputType":"number","DefaultValue":"5","MinValue":"1","MaxValue":"1440","IncludeInCommandLine":false}
 ]

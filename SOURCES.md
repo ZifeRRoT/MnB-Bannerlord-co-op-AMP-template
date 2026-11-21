@@ -42,7 +42,7 @@ AMPTemplates не є підтвердженням приймання CubeCoders 
 порядок Update stages, збереження старих файлів гри й сейвів. Реальна
 Steam Guard сесія після shell-переходу та приймання кампанії ще не перевірені.
 
-У Linux AMP Wine image пройшли всі 15 shell-перевірок і ShellCheck.
+У Linux AMP Wine image пройшли всі 16 shell-перевірок і ShellCheck.
 Новий shell smoke-тест підтвердив створення Wine prefix та передачу stop
 Windows cmd через PTY із кодом завершення 7. jq уже є в перевіреному образі,
 тому додаткові пакети контейнера не встановлюються.

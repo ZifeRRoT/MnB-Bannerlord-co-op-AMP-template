@@ -39,12 +39,12 @@ wineserver, Xvfb, xauth, script і timeout.
 | Server password | Приховане поле пароля гравців; порожнє значення вимикає пароль |
 | Campaign save | Ім'я сейву без розширення: ASCII-літери, цифри, `_`, `-` |
 | Autosave minutes | Автозбереження, 1–1440 хвилин |
-| Engine region | Наприклад EU |
 
 Зміни застосовуються на наступному **Start**. Server password — не Steam-пароль.
 Поле Steam username видалено. Акаунт визначається з кешу AMP; якщо старих акаунтів
 кілька, скрипт перевіряє токени без пароля й використовує перший придатний.
 Старий steam_username у settings.json ігнорується.
+Регіон engine зафіксовано як EU у скрипті; старий ключ region також ігнорується.
 
 Пароль зберігається у приватному settings.json, а під час Start через jq
 переноситься в data/server-config.json. Значення не передається через argv чи
@@ -110,6 +110,11 @@ Ready marker: `coop server up, waiting for clients`. Очікувані кома
 status, players, save, stop; звірте з help/@DS@ встановленого build.
 AMP Stop надсилає stop і чекає 180 секунд. Реальне збереження кампанії ще
 потрібно перевірити. Force Stop не гарантує збереження.
+
+ANSI-коди кольору/курсора очищаються у виводі shell SteamCMD; для виводу гри
+також задано Console.FilterMatchRegex. Звичайний текст і Unicode зберігаються.
+Очищення штатного SteamCMD login-stage залежить від обробки виводу самим AMP;
+shell-фільтр працює на наступному Workshop-етапі. Старі рядки консолі не змінюються.
 
 Ланцюжок запуску: exec → xvfb-run → script → Wine engine. PTY має
 `stty -echo inlcr`, script --return зберігає exit code. Пароля в цій команді
@@ -184,7 +189,7 @@ Shell-тести перевіряють пароль/JSON/argv, кеш на шт
 Smoke-тест створює Wine prefix і перевіряє stop/exit code Windows cmd через PTY.
 Це не запуск гри й не перевірка реального Steam-сеансу.
 
-Локальний результат: усі 15 shell-перевірок пройшли в Linux AMP Wine image;
+Локальний результат: усі 16 shell-перевірок пройшли в Linux AMP Wine image;
 ShellCheck не виявив зауважень. Wine smoke-тест повернув WINE_PREFIX_OK та
 WINE_STDIO_STOP_AND_EXIT_STATUS_OK. Пароль перевірено зі спецсимволами й Unicode;
 тест запуску підтвердив його відсутність у командному рядку.

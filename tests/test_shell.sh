@@ -23,6 +23,11 @@ jq -e '.[0].UpdateSource == "FetchURL" and .[1].UpdateSource == "SteamCMD" and
 if grep -E 'python|base64' "$REPO/mount-and-blade2-coop.kvp" "$REPO/mount-and-blade2-coopupdates.json"; then exit 1; fi
 pass 'AMP manifests: masked password, no username/Python/base64, requested display name'
 
+printf '\033[0m\033[1mLogging in...\033[0mOK\nПривіт [warning]\n\033[?25lready\033[?25h\n' | strip_ansi > "$WORK/clean-output"
+printf 'Logging in...OK\nПривіт [warning]\nready\n' > "$WORK/expected-output"
+cmp "$WORK/expected-output" "$WORK/clean-output"
+pass 'ANSI color/cursor codes removed; Unicode, brackets and line breaks preserved'
+
 settings
 prepare_config 4300
 jq -e '.port==4300 and .password=="" and .saveName=="saveauto1"' "$ROOT/data/server-config.json" >/dev/null
@@ -91,7 +96,7 @@ cp "$WORK/multiple.vdf" "$cache"
 cat > "$ROOT/steamcmd.sh" <<'SH'
 #!/bin/bash
 [[ "$4" == owner ]] || exit 1
-printf "Logging in user 'owner'...OK\n"
+printf "Logging in user 'owner'...\033[0mOK\n"
 SH
 [[ $(steam_account) == owner ]]
 sed 's/"stale" { "SteamID" "12" } //' "$cache" > "$WORK/single.vdf"
@@ -118,10 +123,13 @@ set -euo pipefail
 [[ "$1" == +@NoPromptForPassword && "$2" == 1 ]]
 [[ " $* " == *' +login owner +workshop_download_item 261550 3770450698 validate +quit '* ]]
 if read -r -t 1 unexpected; then exit 9; fi
-printf 'Success. Downloaded item 3770450698 to workshop\n'
+printf '\033[0mSuccess. Downloaded item 3770450698 to workshop\033[0m\n'
+printf '\033[33mSteam warning\033[0m\n' >&2
 SH
 update > "$WORK/update.log"
 grep -q 'Workshop update finished' "$WORK/update.log"
+grep -qx 'Steam warning' "$WORK/update.log"
+if grep -q $'\033' "$WORK/update.log"; then exit 1; fi
 pass 'Workshop update uses AMP HOME, cached account and closed stdin'
 
 printf '#!/bin/bash\nprintf "ERROR! Download item failed\\n"\nexit 0\n' > "$ROOT/steamcmd.sh"

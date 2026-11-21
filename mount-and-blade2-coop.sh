@@ -10,17 +10,20 @@ ITEM=3770450698
 die() { printf '[coop] ERROR: %s\n' "$*" >&2; exit 1; }
 log() { printf '[coop] %s\n' "$*"; }
 
+# SteamCMD emits ANSI CSI sequences even when AMP is not a terminal. Keep text,
+# Unicode and line breaks; remove only terminal color/cursor control sequences.
+strip_ansi() { LC_ALL=C sed -u -E $'s|\033\\[[0-?]*[ -/]*[@-~]||g'; }
+
 settings() {
     if [[ ! -f "$ROOT/settings.json" ]]; then
-        printf '%s\n' '{"saveName":"saveauto1","autosaveMinutes":5,"region":"EU","password":""}' > "$ROOT/settings.json"
+        printf '%s\n' '{"saveName":"saveauto1","autosaveMinutes":5,"password":""}' > "$ROOT/settings.json"
     fi
     chmod 600 "$ROOT/settings.json"
     jq -e 'type == "object" and
       ((.saveName // "saveauto1") | type == "string" and test("^[A-Za-z0-9_-]{1,80}$")) and
       ((.autosaveMinutes // 5) | type == "number" and floor == . and . >= 1 and . <= 1440) and
-      ((.region // "EU") | type == "string" and test("^[A-Z]{2,8}$")) and
       ((has("password") | not) or (.password | type == "string"))' \
-      "$ROOT/settings.json" >/dev/null || die 'Invalid settings.json; check save name, autosave, region and password type'
+      "$ROOT/settings.json" >/dev/null || die 'Invalid settings.json; check save name, autosave and password type'
 }
 
 check_port() {
@@ -94,8 +97,8 @@ steam_account() {
     # passwords or a new UI field; use the first account whose cached login works.
     probe=$(mktemp "$ROOT/.steam-probe.XXXXXX")
     while IFS= read -r account; do
-        if HOME="$ROOT/../.virtualhome" timeout 180 /bin/bash "$ROOT/steamcmd.sh" \
-            +@NoPromptForPassword 1 +login "$account" +quit </dev/null >"$probe" 2>&1 &&
+        if HOME="$ROOT/../.virtualhome" TERM=dumb NO_COLOR=1 timeout 180 /bin/bash "$ROOT/steamcmd.sh" \
+            +@NoPromptForPassword 1 +login "$account" +quit </dev/null 2>&1 | strip_ansi >"$probe" &&
             grep -Eq 'Logging in.*[.][.][.]OK' "$probe"; then
             rm -f -- "$probe"
             printf '%s\n' "$account"
@@ -110,10 +113,10 @@ update() {
     local account output
     account=$(steam_account)
     output=$(mktemp "$ROOT/.workshop-update.XXXXXX")
-    if ! HOME="$ROOT/../.virtualhome" timeout 7200 /bin/bash "$ROOT/steamcmd.sh" \
+    if ! HOME="$ROOT/../.virtualhome" TERM=dumb NO_COLOR=1 timeout 7200 /bin/bash "$ROOT/steamcmd.sh" \
         +@NoPromptForPassword 1 +@sSteamCmdForcePlatformType windows \
         +force_install_dir "$ROOT/workshop" +login "$account" \
-        +workshop_download_item "$APP" "$ITEM" validate +quit </dev/null | tee "$output"; then
+        +workshop_download_item "$APP" "$ITEM" validate +quit </dev/null 2>&1 | strip_ansi | tee "$output"; then
         rm -f -- "$output"
         die 'Workshop update failed; retry AMP Update login if the cached session expired'
     fi
@@ -150,7 +153,7 @@ prepare_config() {
 }
 
 start() {
-    local port=$1 engine=$2 game data name region mid token command binary
+    local port=$1 engine=$2 game data name mid token command binary
     check_port "$port" 65534; check_port "$engine"
     (( engine != port && engine != port+1 )) || die 'Engine port overlaps Co-op ports'
     for binary in wine wineboot wineserver xvfb-run script timeout; do
@@ -160,7 +163,6 @@ start() {
     prepare_config "$port"
     data="$ROOT/data"
     name=$(jq -r '.saveName // "saveauto1"' "$ROOT/settings.json")
-    region=$(jq -r '.region // "EU"' "$ROOT/settings.json")
     mkdir -p -- "$data/Game Saves"
     if [[ ! -f "$data/Game Saves/$name.sav" ]]; then
         cp -- "$game/server-data/Game Saves/default_new_game.sav" "$data/Game Saves/$name.sav"
@@ -183,7 +185,7 @@ start() {
     cd -- "$game/engine/bin/Win64_Shipping_Server"
     # %q quotes only paths/module names/ports. Password stays in JSON on disk.
     printf -v command '%q ' wine "$game/engine/dotnet/dotnet.exe" TaleWorlds.Starter.DotNetCore.dll \
-        "$token" /dedicatedcustomserver "$engine" "$region" 0
+        "$token" /dedicatedcustomserver "$engine" EU 0
     export SHELL=/bin/bash
     exec xvfb-run -a script --quiet --return --command "stty -echo inlcr; exec $command" /dev/null
 }
