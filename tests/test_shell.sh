@@ -23,11 +23,6 @@ jq -e '.[0].UpdateSource == "FetchURL" and .[1].UpdateSource == "SteamCMD" and
 if grep -E 'python|base64' "$REPO/mount-and-blade2-coop.kvp" "$REPO/mount-and-blade2-coopupdates.json"; then exit 1; fi
 pass 'AMP manifests: masked password, no username/Python/base64, requested display name'
 
-printf '\033[0m\033[1mLogging in...\033[0mOK\nПривіт [warning]\n\033[?25lready\033[?25h\n' | strip_ansi > "$WORK/clean-output"
-printf 'Logging in...OK\nПривіт [warning]\nready\n' > "$WORK/expected-output"
-cmp "$WORK/expected-output" "$WORK/clean-output"
-pass 'ANSI color/cursor codes removed; Unicode, brackets and line breaks preserved'
-
 settings
 prepare_config 4300
 jq -e '.port==4300 and .password=="" and .saveName=="saveauto1"' "$ROOT/data/server-config.json" >/dev/null
@@ -128,8 +123,7 @@ printf '\033[33mSteam warning\033[0m\n' >&2
 SH
 update > "$WORK/update.log"
 grep -q 'Workshop update finished' "$WORK/update.log"
-grep -qx 'Steam warning' "$WORK/update.log"
-if grep -q $'\033' "$WORK/update.log"; then exit 1; fi
+grep -Fqx $'\033[33mSteam warning\033[0m' "$WORK/update.log"
 pass 'Workshop update uses AMP HOME, cached account and closed stdin'
 
 printf '#!/bin/bash\nprintf "ERROR! Download item failed\\n"\nexit 0\n' > "$ROOT/steamcmd.sh"

@@ -10,10 +10,6 @@ ITEM=3770450698
 die() { printf '[coop] ERROR: %s\n' "$*" >&2; exit 1; }
 log() { printf '[coop] %s\n' "$*"; }
 
-# SteamCMD emits ANSI CSI sequences even when AMP is not a terminal. Keep text,
-# Unicode and line breaks; remove only terminal color/cursor control sequences.
-strip_ansi() { LC_ALL=C sed -u -E $'s|\033\\[[0-?]*[ -/]*[@-~]||g'; }
-
 settings() {
     if [[ ! -f "$ROOT/settings.json" ]]; then
         printf '%s\n' '{"saveName":"saveauto1","autosaveMinutes":5,"password":""}' > "$ROOT/settings.json"
@@ -97,9 +93,9 @@ steam_account() {
     # passwords or a new UI field; use the first account whose cached login works.
     probe=$(mktemp "$ROOT/.steam-probe.XXXXXX")
     while IFS= read -r account; do
-        if HOME="$ROOT/../.virtualhome" TERM=dumb NO_COLOR=1 timeout 180 /bin/bash "$ROOT/steamcmd.sh" \
-            +@NoPromptForPassword 1 +login "$account" +quit </dev/null 2>&1 | strip_ansi >"$probe" &&
-            grep -Eq 'Logging in.*[.][.][.]OK' "$probe"; then
+        if HOME="$ROOT/../.virtualhome" timeout 180 /bin/bash "$ROOT/steamcmd.sh" \
+            +@NoPromptForPassword 1 +login "$account" +quit </dev/null >"$probe" 2>&1 &&
+            grep -Eq 'Logging in.*[.][.][.].*OK' "$probe"; then
             rm -f -- "$probe"
             printf '%s\n' "$account"
             return
@@ -113,10 +109,10 @@ update() {
     local account output
     account=$(steam_account)
     output=$(mktemp "$ROOT/.workshop-update.XXXXXX")
-    if ! HOME="$ROOT/../.virtualhome" TERM=dumb NO_COLOR=1 timeout 7200 /bin/bash "$ROOT/steamcmd.sh" \
+    if ! HOME="$ROOT/../.virtualhome" timeout 7200 /bin/bash "$ROOT/steamcmd.sh" \
         +@NoPromptForPassword 1 +@sSteamCmdForcePlatformType windows \
         +force_install_dir "$ROOT/workshop" +login "$account" \
-        +workshop_download_item "$APP" "$ITEM" validate +quit </dev/null 2>&1 | strip_ansi | tee "$output"; then
+        +workshop_download_item "$APP" "$ITEM" validate +quit </dev/null 2>&1 | tee "$output"; then
         rm -f -- "$output"
         die 'Workshop update failed; retry AMP Update login if the cached session expired'
     fi

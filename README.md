@@ -111,10 +111,8 @@ status, players, save, stop; звірте з help/@DS@ встановленог�
 AMP Stop надсилає stop і чекає 180 секунд. Реальне збереження кампанії ще
 потрібно перевірити. Force Stop не гарантує збереження.
 
-ANSI-коди кольору/курсора очищаються у виводі shell SteamCMD; для виводу гри
-також задано Console.FilterMatchRegex. Звичайний текст і Unicode зберігаються.
-Очищення штатного SteamCMD login-stage залежить від обробки виводу самим AMP;
-shell-фільтр працює на наступному Workshop-етапі. Старі рядки консолі не змінюються.
+Вивід SteamCMD передається без ANSI-фільтрації. Консоль AMP може показувати
+коди кольору/курсора як символи; це не помилка авторизації чи завантаження.
 
 Ланцюжок запуску: exec → xvfb-run → script → Wine engine. PTY має
 `stty -echo inlcr`, script --return зберігає exit code. Пароля в цій команді
@@ -189,7 +187,7 @@ Shell-тести перевіряють пароль/JSON/argv, кеш на шт
 Smoke-тест створює Wine prefix і перевіряє stop/exit code Windows cmd через PTY.
 Це не запуск гри й не перевірка реального Steam-сеансу.
 
-Локальний результат: усі 16 shell-перевірок пройшли в Linux AMP Wine image;
+Локальний результат: усі 15 shell-перевірок пройшли в Linux AMP Wine image;
 ShellCheck не виявив зауважень. Wine smoke-тест повернув WINE_PREFIX_OK та
 WINE_STDIO_STOP_AND_EXIT_STATUS_OK. Пароль перевірено зі спецсимволами й Unicode;
 тест запуску підтвердив його відсутність у командному рядку.
