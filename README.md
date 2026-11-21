@@ -5,12 +5,12 @@ AMP-контейнер із Wine, Xvfb і PTY. Власний Dockerfile не п
 
 **Ще не перевірено на справжньому AMP:** Create Instance, entitled Workshop
 download, готовність гри, підключення гравців, Stop зі збереженням і відновлення
-кампанії. Потрібен перший інтерактивний Steam login.
+кампанії. Steam login і Steam Guard тепер проходять через діалог AMP Update.
 Цей репозиторій не є підтвердженим production-ready рішенням.
 
 ## Додати шаблон у ADS
 
-Файли лежать локально й ще не опубліковані. Після публікації додайте в
+Додайте опублікований репозиторій у
 **ADS → Configuration → Instance Deployment → Configuration Repositories**:
 
 ```text
@@ -45,33 +45,11 @@ LOCAL-механізм описаний офіційною wiki; вашу збі
 
 ## Перше встановлення нового інстансу
 
-Вимкніть автозапуск нового інстансу до авторизації. Перший Update встановлює
-runtime із вбудованої копії в update manifest, створює settings.json, а потім
-очікувано зупиняється з повідомленням про незаповнений steam_username.
-Ручне копіювання скриптів чи завантаження raw GitHub URL не потрібні.
-Знайдіть корінь **нового Co-op інстансу**, не ADS, через `ampinstmgr list`.
-На Linux-хості виконайте з клону як власник інстансу:
-
-```bash
-read -r -p 'Absolute NEW Co-op AMP instance directory: ' INSTANCE_DIR
-test -f "$INSTANCE_DIR/AMPConfig.conf" || exit 1
-docker ps --format 'table {{.Names}}\t{{.Image}}'
-read -r -p 'Exact NEW Co-op container name: ' COOP_CONTAINER
-docker exec "$COOP_CONTAINER" id amp
-```
-
-Далі команди припускають користувача `amp` всередині контейнера. Якщо його немає,
-підставте фактичне ім'я/UID користувача AMP. Login і Update не запускайте як root.
-Каталог інстансу всередині стандартного AMP-контейнера монтується в `/AMP`.
-
-У налаштуваннях нового інстансу заповніть Steam username, Campaign save,
-Autosave minutes, Engine region. Вони записуються у приватний
-`bannerlord-coop/settings.json`. Якщо потрібна початкова заготовка:
-
-```bash
-docker exec -it --user amp "$COOP_CONTAINER" \
-  python3 /AMP/bannerlord-coop/runtime.py init
-```
+Вимкніть автозапуск нового інстансу до авторизації. У налаштуваннях заповніть
+Campaign save, Autosave minutes, Engine region. **Steam username (optional)**
+залиште порожнім: один акаунт із кешу AMP вибирається автоматично. Це поле
+потрібне лише для вибору між кількома вже авторизованими акаунтами.
+Ручне копіювання скриптів, raw GitHub URL і вхід у контейнер для login не потрібні.
 
 ## Steam Guard, встановлення й оновлення
 
@@ -79,27 +57,49 @@ docker exec -it --user amp "$COOP_CONTAINER" \
 `3770450698`, який сторонній dedicated launcher використовує як джерело
 `DedicatedServer`, bundled engine та .NET. Повний клієнт через app_update не потрібен.
 
-Перший вхід виконуйте в інтерактивному терміналі контейнера:
+Натисніть **Update** у новому інстансі. У штатному діалозі AMP введіть Steam login,
+пароль та Steam Guard. Пароль вводиться саме у діалозі, а не в Console або JSON.
+AMP може знову запитувати дані при наступних Update: увімкнено
+`SteamForceLoginPrompt=True`, як у штатному upstream-шаблоні.
 
-```bash
-docker exec -it --user amp "$COOP_CONTAINER" \
-  python3 /AMP/bannerlord-coop/runtime.py login
-```
+Послідовність Update:
 
-Пароль вводьте у прихованому prompt SteamCMD, далі пройдіть Steam Guard.
-Не вводьте Steam-пароль у AMP Console, JSON, environment чи командний рядок.
-Не записуйте термінальну сесію login. Потім натисніть **Update** в AMP.
+1. Встановлення вбудованого runtime.
+2. Штатний `SteamCMD` stage для app `228980` (Steamworks Common Redistributables),
+   який викликає авторизацію AMP. Може додатково завантажити Windows redistributables;
+   вони не запускаються й не є повним клієнтом Bannerlord.
+3. `Executable` stage завантажує Co-op Workshop через встановлений AMP SteamCMD,
+   використовуючи ту саму `.virtualhome`. У нього stdin закрито та ввімкнено
+   `NoPromptForPassword`: пароль ніколи не запитується через Python/AMP Console.
 
-Використовується підтримуваний AMP `Executable` update stage: він запускає
-`runtime.py update` і використовує кеш Steam без запиту пароля. Після втрати
-авторизації повторіть інтерактивний login. Update блокується на помилці.
-Start не оновлює гру автоматично. Додатково перевіряється наявність bundled .NET.
+Цей підхід повторює Linux Workshop Login/Download stages офіційного шаблону
+`halo3-project-reclaimer`. Python не копіює токен, не друкує config.vdf і не
+використовує кеш інших інстансів. Якщо токена немає/він застарів, повторіть Update
+й авторизацію у вікні AMP. Якщо mobile approval не створює reusable cache,
+введіть код Steam Guard у діалозі AMP, як рекомендує upstream-шаблон.
 
-SteamCMD bootstrap завантажується з офіційного Valve CDN через HTTPS. Bootstrap
-і Workshop mutable: точна версія/хеш гри не закріплені, тому до Update робіть backup.
+Update блокується на помилці. Start не оновлює гру автоматично.
+Точна версія Workshop не закріплена, тому до Update робіть backup.
 Runtime-файл встановлюється з вбудованої у template перевіреної копії.
 Після редагування runtime.py розробник має виконати
 `python3 tools/build_template.py`; `--check` перевіряє відповідність.
+
+## Перехід із попереднього шаблону
+
+Після публікації нової ревізії:
+
+1. Штатно зупиніть гру й зробіть backup.
+2. ADS → Configuration → Instance Deployment → **Fetch Latest**.
+3. На плитці **саме Co-op інстансу** натисніть правою кнопкою → **Refresh Configuration**.
+4. Відкрийте інстанс і натисніть **Update**; пройдіть Steam login/Guard у діалозі AMP.
+5. Після успішного Update натисніть Start.
+
+Звичайна кнопка Update не оновлює сам template: потрібен Refresh Configuration.
+Старі сейви, конфігурація й Wine prefix не переміщуються і не видаляються.
+Кеш попереднього ручного login у `bannerlord-coop/steam` не переноситься:
+авторизуйтеся через AMP один раз. Стара копія гри залишається fallback для Start,
+але після успішного Update нові Workshop-файли мають пріоритет. Це тимчасово може
+подвоїти зайняте грою місце; runtime сам старі файли не видаляє.
 
 ## Запуск, консоль і порти
 
@@ -142,7 +142,10 @@ Runtime виконує exec → xvfb-run → script → Wine engine, збері�
 | `bannerlord-coop/data/server-config.json` | пароль входу та налаштування |
 | `bannerlord-coop/data/mod-config.json` | налаштування мода |
 | `bannerlord-coop/.wine/` | Wine prefix |
-| `bannerlord-coop/steam/` | SteamCMD, Workshop, **секретний кеш авторизації** |
+| `bannerlord-coop/steamcmd.sh` | SteamCMD, встановлений AMP |
+| `.virtualhome/Steam/` | **секретний кеш AMP Steam**, можливі Workshop-файли |
+| `bannerlord-coop/workshop/` | цільове розміщення нових Workshop-файлів |
+| `bannerlord-coop/steam/` | попереднє розміщення гри/кешу, якщо вже було встановлено |
 
 Щоб імпортувати кампанію, зупиніть інстанс, перенесіть `.sav` **разом із
 однойменним `.json`** у Game Saves і задайте ім'я без розширення. Наявний сейв
@@ -156,13 +159,15 @@ Runtime зберігає невідомі поля й пароль, переви
 Після штатного Stop створіть приватну резервну копію як власник інстансу:
 
 ```bash
+read -r -p 'Absolute Co-op AMP instance directory: ' INSTANCE_DIR
+test -d "$INSTANCE_DIR/bannerlord-coop" || exit 1
 BACKUP_FILE="$HOME/bannerlord-coop-$(date +%Y%m%d-%H%M%S).tar.gz"
 umask 077
-tar -C "$INSTANCE_DIR" -czf "$BACKUP_FILE" bannerlord-coop
+tar -C "$INSTANCE_DIR" -czf "$BACKUP_FILE" bannerlord-coop .virtualhome
 ```
 
 Архів містить Steam-токен і паролі. Для відкату зупиніть лише цей інстанс і його
-контейнер. Перемістіть поточний каталог bannerlord-coop у новий каталог поруч,
+контейнер. Перемістіть поточні каталоги bannerlord-coop і .virtualhome у нові каталоги поруч,
 розпакуйте перевірений backup у INSTANCE_DIR, перевірте власника, запустіть.
 Відновлюйте engine, runtime й дані разом; нова версія мода може змінити формат сейвів.
 
@@ -172,9 +177,13 @@ tar -C "$INSTANCE_DIR" -czf "$BACKUP_FILE" bannerlord-coop
 test -d "$INSTANCE_DIR/bannerlord-coop" || exit 1
 read -r -p 'Absolute backup archive path: ' BACKUP_FILE
 test -f "$BACKUP_FILE" || exit 1
-tar -tzf "$BACKUP_FILE"  # перевірте, що це ваш архів із каталогом bannerlord-coop/
+tar -tzf "$BACKUP_FILE"  # перевірте свій архів: bannerlord-coop/ і .virtualhome/
 mv "$INSTANCE_DIR/bannerlord-coop" \
   "$INSTANCE_DIR/bannerlord-coop.before-rollback-$(date +%Y%m%d-%H%M%S)"
+if [ -d "$INSTANCE_DIR/.virtualhome" ]; then
+  mv "$INSTANCE_DIR/.virtualhome" \
+    "$INSTANCE_DIR/.virtualhome.before-rollback-$(date +%Y%m%d-%H%M%S)"
+fi
 tar -xzf "$BACKUP_FILE" -C "$INSTANCE_DIR"
 ```
 
@@ -194,24 +203,28 @@ docker run --rm --platform linux/amd64 --entrypoint python3 \
   cubecoders/ampbase:wine-stable /work/tests/container_smoke.py
 ```
 
-Smoke-тест завантажує тільки SteamCMD, перевіряє `stop`/exit code тестового
+Smoke-тест перевіряє `stop`/exit code тестового
 PTY-процесу, ініціалізує Wine prefix і перевіряє ввід `stop` Windows cmd через
 Wine у тимчасовому контейнері. Це не тест гри.
-Для повторної перевірки Wine без повторного завантаження SteamCMD додайте
-`--skip-steam` після імені smoke-скрипту.
+Штатний Steam login потребує реального AMP-сеансу й тут не емулюється.
 
-Локально пройдено: SteamCMD bootstrap/запуск без login, Python PTY stop/exit code,
+Локально раніше пройдено: SteamCMD bootstrap/запуск без login, Python PTY stop/exit code,
 Wine prefix, Windows console stop/exit code через Wine 11.0. Виправлено зависання
 Mono installer (`WINEDLLOVERRIDES=mscoree,mshtml=`) та перетворення LF→CR.
 Повідомлення X connection broken після закриття тестового Xvfb самі по собі не
 означають збій; орієнтуйтеся на exit code та фінальні маркери тесту.
-Сім unit-тестів перевіряють порти, збереження пароля й невідомих полів, захист
+16 unit-тестів перевіряють порти, збереження пароля й невідомих полів, захист
 імені сейву, некоректний JSON, відповідність bundled runtime і його встановлення
-в каталог із пробілами. Усі сім пройшли; це не перевірка schema завантажувачем AMP.
+в каталог із пробілами, читання mock-кешу AMP, вибір акаунта, порядок auth/download,
+закритий stdin завантажувача та сумісність старого розміщення гри.
+Усі 16 пройшли; це не перевірка реальної Steam-сесії або schema завантажувачем AMP.
 
 На цільовому AMP:
 
 ```bash
+read -r -p 'Absolute Co-op AMP instance directory: ' INSTANCE_DIR
+docker ps --format 'table {{.Names}}\t{{.Image}}'
+read -r -p 'Exact Co-op container name: ' COOP_CONTAINER
 docker exec --user amp "$COOP_CONTAINER" wine --version
 docker exec --user amp "$COOP_CONTAINER" \
   python3 /AMP/bannerlord-coop/runtime.py update
@@ -232,5 +245,5 @@ engine після Stop. Не публікуйте config.vdf або JSON із п
   самим bind mount зберігає дані.
 - Другий інстанс не конфліктує портами чи файлами.
 
-Доступу до вашого Ubuntu/AMP у сесії немає; зміни в GitHub не публікувалися.
+Доступу до вашого Ubuntu/AMP у сесії немає; нові локальні зміни ще треба опублікувати.
 ﻿

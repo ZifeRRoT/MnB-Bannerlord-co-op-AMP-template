@@ -7,6 +7,7 @@ bannerlord-coop/
 settings.json
 steam/
 .wine/
+.virtualhome/
 data/
 *.vdf
 *.sav

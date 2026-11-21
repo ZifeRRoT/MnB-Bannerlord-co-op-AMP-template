@@ -15,10 +15,8 @@ with tempfile.TemporaryDirectory() as folder:
     runtime = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(runtime)
     env = dict(os.environ)
-    if '--skip-steam' not in sys.argv:
-        exe, env = runtime.steam()
-        subprocess.run(['/bin/bash', str(exe), '+quit'], env=env, check=True, timeout=180)
-        print('STEAMCMD_SMOKE_OK', flush=True)
+    # SteamCMD installation/login now belong to AMP's native update stage.
+    # This standalone container has no AMP session or real account cache.
     # A PTY must remain writable after startup and propagate the child's exit code.
     child = root / 'child.py'
     child.write_text('import sys\nprint("PTY_READY", flush=True)\n'

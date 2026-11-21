@@ -8,7 +8,7 @@ from pathlib import Path
 import sys
 
 root = Path(__file__).resolve().parents[1]
-payload = base64.b64encode((root / 'runtime.py').read_bytes()).decode('ascii')
+payload = base64.b64encode((root / 'runtime.py').read_text(encoding='utf-8').encode('utf-8')).decode('ascii')
 code = ("import base64,pathlib,sys; "
         "p=pathlib.Path(sys.argv[1]); "
         "p.parent.mkdir(parents=True,exist_ok=True); "
@@ -17,6 +17,11 @@ stages = [
     {"UpdateStageName": "Install bundled reviewed runtime", "UpdateSourcePlatform": "Linux",
      "UpdateSource": "Executable", "UpdateSourceData": "/usr/bin/python3",
      "UpdateSourceArgs": '-c "' + code + '" "{{$FullRootDir}}runtime.py"', "SkipOnFailure": False},
+    # This login/cache stage is used by upstream Project Reclaimer for Workshop.
+    # The redistributables app avoids downloading the full Bannerlord client.
+    {"UpdateStageName": "Steam login through AMP", "UpdateSourcePlatform": "Linux",
+     "UpdateSource": "SteamCMD", "UpdateSourceData": "228980",
+     "ForceDownloadPlatform": "Windows", "SkipOnFailure": False},
     {"UpdateStageName": "Update Co-op Workshop files (cached Steam login)", "UpdateSourcePlatform": "Linux",
      "UpdateSource": "Executable", "UpdateSourceData": "/usr/bin/python3",
      "UpdateSourceArgs": '-u "{{$FullRootDir}}runtime.py" update', "SkipOnFailure": False}

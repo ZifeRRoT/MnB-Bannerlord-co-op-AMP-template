@@ -3,6 +3,9 @@
 - [AMP Generic wiki](https://github.com/CubeCoders/AMP/wiki/Configuring-the-%27Generic%27-AMP-module): manifest, Git/LOCAL repositories, Executable update stage, STDIO/ExitMethod.
 - [AMP custom images](https://github.com/CubeCoders/AMP/wiki/Using-custom-Docker-images-with-AMP-and-the-generic-module): base image та bind mount `/AMP`.
 - [AMPTemplates](https://github.com/CubeCoders/AMPTemplates/tree/5b57587ab959a89b34aea48a1c508295a9ce081f): порівняно skyrim-together-reborn, abiotic-factor, conan-exiles, arma3 для Wine, SteamCMD, String stop та ChildPorts.Offset.
+- У тій самій ревізії `halo3-project-reclaimerupdates.json` містить Linux Workshop Login stage `SteamCMD`, app `228980`, Windows platform, потім Executable download через `$FullRootDir/steamcmd.sh` і `../.virtualhome/Steam/config/config.vdf`. Його KVP має SteamUpdateAnonymousLogin=False і SteamForceLoginPrompt=True. Новий шаблон повторює цей спосіб без завантаження повної гри.
+- [Steam login у AMP](https://discourse.cubecoders.com/t/why-is-amp-asking-for-my-steam-login-details/2310): штатний діалог і кеш SteamCMD; дані входу не журналюються AMP.
+- [Оновлення конфігурації наявного інстансу](https://discourse.cubecoders.com/t/satisfactory-template-update/4998): Fetch Latest → Refresh Configuration → Update.
 - [Сторонній dedicated launcher](https://github.com/geofmigliacci/egg-bannerlord-coop/tree/aac59029ba1e25c544df68b8780da03e784ffea9): .NET engine invocation, Workshop layout, ports, save seeding, TTY, commands/ready marker. Це не офіційний AMP-компонент. Його код не включений; runtime написано тут.
 - [Офіційний Co-op](https://github.com/Bannerlord-Coop-Team/BannerlordCoop/tree/81827688001aca48a15b925bd92aece227b219c7): README посилається на Workshop 3770450698; deploy/Server Instructions.md вимагає однакові версії та зберігати .sav разом із .json; doc/ServerDataLocations.md описує BANNERLORD_USER_DIR/COOP_DATA_DIR.
 
@@ -16,8 +19,8 @@ Registry повернув linux/amd64 manifest:
 Завантажений index digest:
 `sha256:d3fd4f741da84e7be0d74ce59b153047d6eaea187459c934ffe4a9c3a07bc76b`.
 У запущеному cubecoders/ampbase:wine-stable перевірено Wine 11.0, Python 3.13,
-xvfb-run, xauth, script, wineboot, winepath. SteamCMD у PATH немає; bootstrap
-встановлюється runtime з офіційного Valve CDN у persistent каталог.
+xvfb-run, xauth, script, wineboot, winepath. SteamCMD у PATH немає;
+тепер його встановлення та авторизацію проводить штатний AMP SteamCMD stage.
 
 Тег mutable. Для відтворення замініть Meta.SpecificDockerImage на
 `cubecoders/ampbase@sha256:82460488879b929eb6c08a53352647503ea80634227500a8971cef0d30b898cb`.
@@ -34,3 +37,5 @@ installer та завершення wineserver; Windows cmd отримує stop 
 
 Це приватний експериментальний шаблон. Схожість із
 AMPTemplates не є підтвердженням приймання CubeCoders чи runtime-сумісності AMP 2.8.
+Новий auth/cache шлях перевірено 16 unit-тестами на mock-даних у AMP Wine image;
+реальна Steam Guard сесія у вашому AMP ще не перевірена.

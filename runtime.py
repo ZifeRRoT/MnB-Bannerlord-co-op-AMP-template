@@ -8,8 +8,6 @@ import shlex
 import shutil
 import subprocess
 import sys
-import tarfile
-import urllib.request
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parent
@@ -26,52 +24,105 @@ def read_settings():
     return json.loads(path.read_text())
 
 
+def parse_vdf(text):
+    """Read Steam's text KeyValues without printing or copying authentication data."""
+    tokens = []
+    pattern = re.compile(r'\s+|//[^\n]*|"((?:\\.|[^"\\])*)"|([{}])')
+    position = 0
+    while position < len(text):
+        match = pattern.match(text, position)
+        if not match:
+            raise ValueError("Cannot read AMP Steam cache format; authenticate again through AMP Update")
+        position = match.end()
+        if match.group(1) is not None:
+            tokens.append(("text", re.sub(r'\\(["\\])', r'\1', match.group(1))))
+        elif match.group(2):
+            tokens.append((match.group(2), None))
+    index = 0
+    def block(nested=False):
+        nonlocal index
+        result = {}
+        while index < len(tokens):
+            kind, key = tokens[index]
+            index += 1
+            if kind == "}" and nested:
+                return result
+            if kind != "text" or index >= len(tokens):
+                raise ValueError("Invalid AMP Steam cache structure")
+            kind, value = tokens[index]
+            index += 1
+            if kind == "{":
+                value = block(True)
+            elif kind != "text":
+                raise ValueError("Invalid AMP Steam cache structure")
+            result[key.casefold()] = value
+        if nested:
+            raise ValueError("Incomplete AMP Steam cache structure")
+        return result
+    return block()
+
+
+def cached_account(cache, selected=""):
+    accounts = set()
+    has_cache = False
+    def visit(node):
+        nonlocal has_cache
+        for key, value in node.items():
+            if key == "connectcache" and value:
+                has_cache = True
+            if key == "accounts" and isinstance(value, dict):
+                accounts.update(name for name, details in value.items()
+                                if isinstance(details, dict) and details.get("steamid")
+                                and re.fullmatch(r"[a-z0-9_]{1,64}", name))
+            if isinstance(value, dict):
+                visit(value)
+    try:
+        contents = cache.read_text(encoding="utf-8-sig")
+    except UnicodeError:
+        raise RuntimeError("Cannot decode AMP Steam cache; authenticate again through AMP Update") from None
+    visit(parse_vdf(contents))
+    if not accounts or not has_cache:
+        raise RuntimeError("No reusable AMP Steam login. Run Update and enter the Steam Guard code in AMP")
+    if selected:
+        if not isinstance(selected, str) or selected.casefold() not in accounts:
+            raise RuntimeError("Selected Steam username is not in AMP's cache; clear it or authenticate that account in AMP")
+        return selected.casefold()
+    if len(accounts) != 1:
+        raise RuntimeError("Multiple cached Steam accounts; select Steam username in Co-op settings")
+    return next(iter(accounts))
+
+
 def steam():
-    home = ROOT / "steam"
-    home.mkdir(exist_ok=True, mode=0o700)
-    exe = home / "steamcmd.sh"
-    if not exe.exists():
-        archive = home / "steamcmd.tar.gz"
-        urllib.request.urlretrieve(
-            "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz", archive)
-        with tarfile.open(archive) as data:
-            # Steam's bootstrap contains only regular files/directories. Reject links
-            # and traversal, including future archive changes.
-            for member in data.getmembers():
-                target = (home / member.name).resolve()
-                if not target.is_relative_to(home.resolve()) or not (member.isfile() or member.isdir()):
-                    raise ValueError("Unsafe Steam bootstrap archive")
-            data.extractall(home)
-        archive.unlink()
-    return exe, dict(os.environ, HOME=str(home))
+    # Matches the Linux Workshop stage in upstream halo3-project-reclaimer.
+    # Do not fall back to another instance's cache or the host user's HOME.
+    home = ROOT.parent / ".virtualhome"
+    exe = ROOT / "steamcmd.sh"
+    cache = home / "Steam/config/config.vdf"
+    if not exe.is_file() or not cache.is_file():
+        raise RuntimeError("AMP Steam login is missing. Run Update and complete its Steam login dialog")
+    user = cached_account(cache, read_settings().get("steam_username", ""))
+    return exe, dict(os.environ, HOME=str(home)), user
 
 
 def game_dir():
     suffix = Path("steamapps/workshop/content") / APP / ITEM / "DedicatedServer"
-    for base in (ROOT / "steam/Steam", ROOT / "steam"):
+    for base in (ROOT / "workshop", ROOT.parent / ".virtualhome/Steam",
+                 ROOT / "steam/Steam", ROOT / "steam", ROOT):
         game = base / suffix
         if (game / "engine/dotnet/dotnet.exe").is_file():
             return game
     raise RuntimeError("Workshop DedicatedServer missing. Authenticate, then run AMP Update.")
 
 
-def download(login=False):
-    settings = read_settings()
-    user = settings.get("steam_username", "")
-    if not re.fullmatch(r"[A-Za-z0-9_]{1,64}", user):
-        raise ValueError("Set steam_username in private settings.json first")
-    exe, env = steam()
-    if login:
-        if not sys.stdin.isatty():
-            raise RuntimeError("Login requires docker exec -it terminal, never AMP console")
-        args = ["+login", user, "+quit"]
-    else:
-        args = ["+@NoPromptForPassword", "1", "+login", user,
-                "+workshop_download_item", APP, ITEM, "validate", "+quit"]
-    subprocess.run(["/bin/bash", str(exe), *args], env=env, check=True, cwd=exe.parent)
-    if not login:
-        game_dir()
-        print("[coop] Update finished; Workshop versions are mutable. Back up before updating.", flush=True)
+def download():
+    exe, env, user = steam()
+    args = ["+@NoPromptForPassword", "1", "+@sSteamCmdForcePlatformType", "windows",
+            "+force_install_dir", str(ROOT / "workshop"), "+login", user,
+            "+workshop_download_item", APP, ITEM, "validate", "+quit"]
+    subprocess.run(["/bin/bash", str(exe), *args], env=env, check=True, cwd=exe.parent,
+                   stdin=subprocess.DEVNULL, timeout=7200)
+    game_dir()
+    print("[coop] Update finished; Workshop versions are mutable. Back up before updating.", flush=True)
 
 
 def port(value, maximum=65535):
@@ -157,8 +208,10 @@ if __name__ == "__main__":
     os.umask(0o077)
     try:
         action = sys.argv[1] if len(sys.argv) > 1 else ""
-        if action in ("login", "update"):
-            download(action == "login")
+        if action == "update":
+            download()
+        elif action == "login":
+            raise RuntimeError("Steam login is now managed by AMP. Click Update and use its Steam login dialog")
         elif action == "init":
             read_settings()
         elif action == "start" and len(sys.argv) == 4:
