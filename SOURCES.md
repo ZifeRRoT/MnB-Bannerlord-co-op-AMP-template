@@ -26,9 +26,10 @@ xvfb-run, xauth, script, wineboot, winepath. SteamCMD у PATH немає;
 `cubecoders/ampbase@sha256:82460488879b929eb6c08a53352647503ea80634227500a8971cef0d30b898cb`.
 Workshop і SteamCMD bootstrap mutable; для відкату потрібен локальний backup.
 
-Runtime вбудований у згенерований update manifest у base64, тому встановлення
-не залежить від існування неопублікованого raw URL. Відкритий код — runtime.py;
-tools/build_template.py --check перевіряє відповідність payload.
+Runtime тепер звичайний Bash-файл mount-and-blade2-coop.sh; Python та base64
+прибрано. FetchURL бере його з main цього репозиторію. Це mutable URL:
+для відтворення вкажіть перевірений commit у UpdateSourceData або відновіть
+відповідну версію runtime з backup. jq читає пароль із JSON-файлу, не з argv.
 
 Результати локальних контейнерних перевірок: SteamCMD bootstrap і +quit успішні;
 PTY передає stop і код 7; Wine prefix створено після вимкнення Mono/Gecko
@@ -37,5 +38,11 @@ installer та завершення wineserver; Windows cmd отримує stop 
 
 Це приватний експериментальний шаблон. Схожість із
 AMPTemplates не є підтвердженням приймання CubeCoders чи runtime-сумісності AMP 2.8.
-Новий auth/cache шлях перевірено 16 unit-тестами на mock-даних у AMP Wine image;
-реальна Steam Guard сесія у вашому AMP ще не перевірена.
+Нові shell-тести перевіряють auth/cache на штучних даних, пароль, argv,
+порядок Update stages, збереження старих файлів гри й сейвів. Реальна
+Steam Guard сесія після shell-переходу та приймання кампанії ще не перевірені.
+
+У Linux AMP Wine image пройшли всі 15 shell-перевірок і ShellCheck.
+Новий shell smoke-тест підтвердив створення Wine prefix та передачу stop
+Windows cmd через PTY із кодом завершення 7. jq уже є в перевіреному образі,
+тому додаткові пакети контейнера не встановлюються.
