@@ -43,11 +43,11 @@ wineserver, Xvfb, xauth, script і timeout.
 Зміни застосовуються на наступному **Start**. Server password — не Steam-пароль.
 Поле Steam username видалено. Акаунт визначається з кешу AMP; якщо старих акаунтів
 кілька, скрипт перевіряє токени без пароля й використовує перший придатний.
-Старий steam_username у settings.json ігнорується.
-Регіон engine зафіксовано як EU у скрипті; старий ключ region також ігнорується.
+Старий settings.json більше не використовується. Регіон engine зафіксовано як EU.
 
-Пароль зберігається у приватному settings.json, а під час Start через jq
-переноситься в data/server-config.json. Значення не передається через argv чи
+AMP через AutoMap записує налаштування прямо у data/server-config.json, який
+читає сервер. Застосування до гри потребує Stop → Start. Shell не переносить
+старі defaults із settings.json. Значення пароля не передається через argv чи
 environment і не друкується runtime. Лапки, слеші та Unicode екрануються jq.
 Приховане поле UI не шифрує файли на диску: резервні копії зберігайте приватно.
 
@@ -56,17 +56,19 @@ environment і не друкується runtime. Лапки, слеші та Un
 Потрібен Steam-акаунт із Bannerlord (`261550`). Натисніть Update і пройдіть
 Steam login/пароль/Guard у штатному діалозі AMP, а не в Console.
 
-Update має три етапи:
+Update має чотири етапи:
 
 1. FetchURL завантажує відкритий mount-and-blade2-coop.sh із цього репозиторію.
-2. Штатний SteamCMD stage 228980 (Common Redistributables) проводить авторизацію
+2. Shell init створює data/server-config.json, якщо його немає. AutoMap потребує
+   файла-шаблону до запуску гри. Наявний файл init не перезаписує.
+3. Штатний SteamCMD stage 228980 (Common Redistributables) проводить авторизацію
    AMP. Може завантажити Windows redistributables; це не повна гра.
-3. Bash завантажує Workshop item 3770450698 через той самий SteamCMD і
+4. Bash завантажує Workshop item 3770450698 через той самий SteamCMD і
    .virtualhome. Stdin закритий, NoPromptForPassword=1, timeout — 2 години.
 
 Це схема Login/Workshop Download зі штатного halo3-project-reclaimer.
-Якщо Guard уже OK, але стоїть `app_update 228980 validate`, виконується другий
-етап; shell-завантаження Co-op ще не почалося. При тривалій відсутності прогресу
+Якщо Guard уже OK, але стоїть `app_update 228980 validate`, виконується
+SteamCMD-етап; shell-завантаження Co-op ще не почалося. При тривалій відсутності прогресу
 перевірте Steam content_log.txt. При відсутності reusable cache повторіть
 Update і введіть код Guard у діалозі AMP.
 
@@ -80,9 +82,15 @@ Start не оновлює гру автоматично. Main і Workshop mutabl
 1. Штатно зупиніть гру й зробіть backup.
 2. Після публікації: ADS → Instance Deployment → **Fetch Latest**.
 3. На плитці Co-op інстансу: права кнопка → **Refresh Configuration**.
-4. Перевірте нові поля й задайте **Server password** перед Start. Порожнє поле
+4. Перевірте поля й задайте **Server password** перед Start. Порожнє поле
    означає відкритий сервер і замінить пароль, який раніше задавали вручну в JSON.
-5. Виконайте Update, потім Start.
+5. Виконайте Update, потім Stop → Start. Після Start перевірте saveName та
+   autosaveMinutes у data/server-config.json; пароль публікувати не потрібно.
+
+Виправлення застосування налаштувань — ConfigVersion 7: metaconfig тепер
+посилається на data/server-config.json. Самого Update недостатньо для зміни
+прив'язки — спочатку потрібен Refresh Configuration. Якщо активний metaconfig.json
+інстансу досі містить ConfigFile=settings.json, він ще використовує стару прив'язку.
 
 AppConfigId збережено. Через перейменування файлів конкретна збірка ADS може
 не знайти старий ConfigRoot під час Refresh. У такому разі не видаляйте інстанс:
@@ -122,10 +130,9 @@ AMP Stop надсилає stop і чекає 180 секунд. Реальне з
 
 | Шлях від кореня інстансу | Вміст |
 | --- | --- |
-| bannerlord-coop/settings.json | Налаштування AMP, пароль гравців |
 | bannerlord-coop/data/Game Saves/ | Сейви .sav і однойменні .json |
 | bannerlord-coop/data/logs/ | Логи мода |
-| bannerlord-coop/data/server-config.json | Застосована конфігурація |
+| bannerlord-coop/data/server-config.json | Налаштування AMP та конфігурація гри, зокрема пароль |
 | bannerlord-coop/.wine/ | Wine prefix |
 | .virtualhome/Steam/ | Приватний кеш Steam і можливі Workshop-файли |
 | bannerlord-coop/workshop/ | Нові Workshop-файли |
@@ -187,7 +194,7 @@ Shell-тести перевіряють пароль/JSON/argv, кеш на шт
 Smoke-тест створює Wine prefix і перевіряє stop/exit code Windows cmd через PTY.
 Це не запуск гри й не перевірка реального Steam-сеансу.
 
-Локальний результат: усі 15 shell-перевірок пройшли в Linux AMP Wine image;
+Локальний результат: усі 16 shell-перевірок пройшли в Linux AMP Wine image;
 ShellCheck не виявив зауважень. Wine smoke-тест повернув WINE_PREFIX_OK та
 WINE_STDIO_STOP_AND_EXIT_STATUS_OK. Пароль перевірено зі спецсимволами й Unicode;
 тест запуску підтвердив його відсутність у командному рядку.

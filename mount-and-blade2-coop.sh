@@ -11,15 +11,16 @@ die() { printf '[coop] ERROR: %s\n' "$*" >&2; exit 1; }
 log() { printf '[coop] %s\n' "$*"; }
 
 settings() {
-    if [[ ! -f "$ROOT/settings.json" ]]; then
-        printf '%s\n' '{"saveName":"saveauto1","autosaveMinutes":5,"password":""}' > "$ROOT/settings.json"
+    mkdir -p -- "$ROOT/data"
+    if [[ ! -f "$ROOT/data/server-config.json" ]]; then
+        printf '%s\n' '{"port":4200,"saveName":"saveauto1","autosaveMinutes":5,"password":"","logFile":true,"steam":false}' > "$ROOT/data/server-config.json"
     fi
-    chmod 600 "$ROOT/settings.json"
+    chmod 600 "$ROOT/data/server-config.json"
     jq -e 'type == "object" and
       ((.saveName // "saveauto1") | type == "string" and test("^[A-Za-z0-9_-]{1,80}$")) and
       ((.autosaveMinutes // 5) | type == "number" and floor == . and . >= 1 and . <= 1440) and
       ((has("password") | not) or (.password | type == "string"))' \
-      "$ROOT/settings.json" >/dev/null || die 'Invalid settings.json; check save name, autosave and password type'
+      "$ROOT/data/server-config.json" >/dev/null || die 'Invalid data/server-config.json; check save name, autosave and password type'
 }
 
 check_port() {
@@ -131,16 +132,14 @@ prepare_config() {
     settings
     mkdir -p -- "$data"
     old="$data/server-config.json"
-    # Secrets are read from files, never passed as jq --arg / environment values.
-    if [[ ! -f "$old" ]]; then printf '{}\n' > "$old"; fi
+    # AMP maps settings directly into this file. Only normalize engine defaults
+    # and the allocated port; never replace UI settings from a second file.
     temporary=$(mktemp "$data/.server-config.XXXXXX")
-    if ! jq -s --argjson port "$port" '
-      .[0] as $old | .[1] as $settings |
-      if ($old | type) != "object" then error("Expected server config object") else
-      $old + {port:$port, saveName:($settings.saveName // "saveauto1"),
-        autosaveMinutes:($settings.autosaveMinutes // 5), logFile:true, steam:false,
-        password:(if $settings | has("password") then $settings.password else ($old.password // "") end)} end
-      ' "$old" "$ROOT/settings.json" > "$temporary"; then
+    if ! jq --argjson port "$port" '
+      . + {port:$port, saveName:(.saveName // "saveauto1"),
+        autosaveMinutes:(.autosaveMinutes // 5), logFile:true, steam:false,
+        password:(.password // "")}
+      ' "$old" > "$temporary"; then
         rm -f -- "$temporary"
         die 'Invalid JSON configuration; existing server-config.json was preserved'
     fi
@@ -158,7 +157,7 @@ start() {
     game=$(game_dir)
     prepare_config "$port"
     data="$ROOT/data"
-    name=$(jq -r '.saveName // "saveauto1"' "$ROOT/settings.json")
+    name=$(jq -r '.saveName // "saveauto1"' "$data/server-config.json")
     mkdir -p -- "$data/Game Saves"
     if [[ ! -f "$data/Game Saves/$name.sav" ]]; then
         cp -- "$game/server-data/Game Saves/default_new_game.sav" "$data/Game Saves/$name.sav"

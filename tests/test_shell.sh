@@ -17,50 +17,56 @@ grep -Fx 'Meta.DisplayName=Mount & Blade II: Bannerlord Co-op' "$REPO/mount-and-
 jq -e 'all(.[]; .FieldName != "steam_username") and
   any(.[]; .FieldName == "ServerPassword" and .InputType == "Password" and .IncludeInCommandLine == false)' \
   "$REPO/mount-and-blade2-coopconfig.json" >/dev/null
-jq -e '.[0].UpdateSource == "FetchURL" and .[1].UpdateSource == "SteamCMD" and
-  .[1].UpdateSourceData == "228980" and .[2].UpdateSourceData == "/bin/bash"' \
+jq -e '.[0].UpdateSource == "FetchURL" and .[1].UpdateSource == "Executable" and
+  (.[1].UpdateSourceArgs | endswith(" init")) and .[2].UpdateSource == "SteamCMD" and
+  .[2].UpdateSourceData == "228980" and .[3].UpdateSourceData == "/bin/bash"' \
   "$REPO/mount-and-blade2-coopupdates.json" >/dev/null
+jq -e '.[0].ConfigFile == "data/server-config.json" and .[0].AutoMap == true' \
+  "$REPO/mount-and-blade2-coopmetaconfig.json" >/dev/null
 if grep -E 'python|base64' "$REPO/mount-and-blade2-coop.kvp" "$REPO/mount-and-blade2-coopupdates.json"; then exit 1; fi
 pass 'AMP manifests: masked password, no username/Python/base64, requested display name'
 
-settings
+cp "$REPO/mount-and-blade2-coop.sh" "$ROOT/mount-and-blade2-coop.sh"
+bash "$ROOT/mount-and-blade2-coop.sh" init
 prepare_config 4300
 jq -e '.port==4300 and .password=="" and .saveName=="saveauto1"' "$ROOT/data/server-config.json" >/dev/null
 pass 'first-run configuration'
 
-cat > "$ROOT/settings.json" <<'JSON'
-{"saveName":"campaign-1","autosaveMinutes":7,"region":"EU","password":"p\"a\\ss,} | & $(touch SHOULD_NOT_EXIST)\nПривіт"}
+cat > "$ROOT/data/server-config.json" <<'JSON'
+{"saveName":"campaign-1","autosaveMinutes":7,"futureOption":42,"password":"p\"a\\ss,} | & $(touch SHOULD_NOT_EXIST)\nПривіт"}
 JSON
-printf '{"futureOption":42,"password":"old"}\n' > "$ROOT/data/server-config.json"
+cp "$ROOT/data/server-config.json" "$WORK/amp-config.json"
+bash "$ROOT/mount-and-blade2-coop.sh" init
+cmp "$WORK/amp-config.json" "$ROOT/data/server-config.json"
+pass 'Update init creates the AutoMap target and preserves existing AMP settings'
 prepare_config 4400
 jq -e '.futureOption==42 and .port==4400 and .saveName=="campaign-1" and .autosaveMinutes==7' "$ROOT/data/server-config.json" >/dev/null
-jq -s -e '.[0].password==.[1].password' "$ROOT/settings.json" "$ROOT/data/server-config.json" >/dev/null
+jq -s -e '.[0].password==.[1].password' "$WORK/amp-config.json" "$ROOT/data/server-config.json" >/dev/null
 [[ ! -e SHOULD_NOT_EXIST ]]
 pass 'password quotes, backslashes, newline, Unicode and shell metacharacters survive JSON merge'
 
-jq '.password=""' "$ROOT/settings.json" > "$WORK/blank.json"
-mv "$WORK/blank.json" "$ROOT/settings.json"
+jq '.password=""' "$ROOT/data/server-config.json" > "$WORK/blank.json"
+mv "$WORK/blank.json" "$ROOT/data/server-config.json"
 prepare_config 4400
 jq -e '.password==""' "$ROOT/data/server-config.json" >/dev/null
 pass 'clearing password disables password protection'
 
-printf '{"saveName":"saveauto1","region":"EU","autosaveMinutes":5,"steam_username":"ignored"}\n' > "$ROOT/settings.json"
-printf '{"password":"legacy","futureOption":42}\n' > "$ROOT/data/server-config.json"
+printf '{"saveName":"saveauto1","password":"stale","steam_username":"ignored"}\n' > "$ROOT/settings.json"
+printf '{"saveName":"dadada","password":"legacy","futureOption":42}\n' > "$ROOT/data/server-config.json"
 prepare_config 4400
-jq -e '.password=="legacy" and .futureOption==42' "$ROOT/data/server-config.json" >/dev/null
-pass 'legacy JSON without password preserves existing server password; username ignored'
+jq -e '.saveName=="dadada" and .password=="legacy" and .futureOption==42' "$ROOT/data/server-config.json" >/dev/null
+pass 'stale legacy settings.json cannot overwrite values AMP wrote to server config'
 
 for invalid in 0 04200 65535 -1 '4200;echo bad'; do reject prepare_config "$invalid"; done
 reject start 4200 4201
 pass 'invalid/overlapping allocations rejected'
 
-printf '{"saveName":"../../escape"}\n' > "$ROOT/settings.json"
+printf '{"saveName":"../../escape"}\n' > "$ROOT/data/server-config.json"
 reject prepare_config 4200
-printf '{"saveName":"safe","password":123}\n' > "$ROOT/settings.json"
+printf '{"saveName":"safe","password":123}\n' > "$ROOT/data/server-config.json"
 reject prepare_config 4200
 pass 'save traversal and non-string password rejected'
 
-printf '{"saveName":"safe"}\n' > "$ROOT/settings.json"
 printf '{"password":"keep", // comment\n}\n' > "$ROOT/data/server-config.json"
 cp "$ROOT/data/server-config.json" "$WORK/original.json"
 reject prepare_config 4200
@@ -131,8 +137,7 @@ reject update
 pass 'SteamCMD exit zero without download confirmation does not pass update'
 
 # Mock the Windows process boundary to inspect launch args without real game files.
-printf '{"saveName":"safe","region":"EU","password":"DO_NOT_LEAK_SERVER_PASSWORD"}\n' > "$ROOT/settings.json"
-printf '{}\n' > "$ROOT/data/server-config.json"
+printf '{"saveName":"safe","password":"DO_NOT_LEAK_SERVER_PASSWORD"}\n' > "$ROOT/data/server-config.json"
 game=$(game_dir)
 mkdir -p "$game/engine/Modules/Coop" "$game/engine/bin/Win64_Shipping_Server" "$ROOT/.wine" "$ROOT/data/Game Saves" "$WORK/bin"
 printf '<Module>\n<Id value="CoopNightly" />\n</Module>\n' > "$game/engine/Modules/Coop/SubModule.xml"

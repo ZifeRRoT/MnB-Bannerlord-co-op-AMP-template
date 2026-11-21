@@ -10,6 +10,14 @@
         "SkipOnFailure":  false
     },
     {
+        "UpdateStageName": "Create server config for AMP AutoMap",
+        "UpdateSourcePlatform": "Linux",
+        "UpdateSource": "Executable",
+        "UpdateSourceData": "/bin/bash",
+        "UpdateSourceArgs": "\"{{$FullRootDir}}mount-and-blade2-coop.sh\" init",
+        "SkipOnFailure": false
+    },
+    {
         "UpdateStageName":  "Steam login through AMP",
         "UpdateSourcePlatform":  "Linux",
         "UpdateSource":  "SteamCMD",
