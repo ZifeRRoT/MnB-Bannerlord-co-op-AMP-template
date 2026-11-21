@@ -15,40 +15,44 @@ for path in "$REPO"/*.json; do jq -e . "$path" >/dev/null; done
 [[ $(jq -r .prefix "$REPO/manifest.json") == '' ]]
 grep -Fx 'Meta.DisplayName=Mount & Blade II: Bannerlord Co-op' "$REPO/mount-and-blade2-coop.kvp" >/dev/null
 jq -e 'all(.[]; .FieldName != "steam_username") and
-  any(.[]; .FieldName == "ServerPassword" and .InputType == "Password" and .IncludeInCommandLine == false)' \
+  any(.[]; .FieldName == "ServerPassword" and .InputType == "Password" and .IncludeInCommandLine == false) and
+  any(.[]; .FieldName == "SteamAdvertise" and .ParamFieldName == "$.steam" and .InputType == "checkbox" and .DefaultValue == "false")' \
   "$REPO/mount-and-blade2-coopconfig.json" >/dev/null
-jq -e '.[0].UpdateSource == "FetchURL" and .[1].UpdateSource == "Executable" and
-  (.[1].UpdateSourceArgs | endswith(" init")) and .[2].UpdateSource == "SteamCMD" and
-  .[2].UpdateSourceData == "228980" and .[3].UpdateSourceData == "/bin/bash"' \
+jq -e 'any(.[]; .UpdateSourcePlatform == "Windows" and .UpdateSourceData == "powershell.exe") and
+  any(.[]; .UpdateSourcePlatform == "Linux" and .UpdateSourceData == "/bin/bash") and
+  any(.[]; .UpdateSourcePlatform == "All" and .UpdateSource == "SteamCMD" and .UpdateSourceData == "228980")' \
   "$REPO/mount-and-blade2-coopupdates.json" >/dev/null
 jq -e '.[0].ConfigFile == "data/server-config.json" and .[0].AutoMap == true' \
   "$REPO/mount-and-blade2-coopmetaconfig.json" >/dev/null
 if grep -E 'python|base64' "$REPO/mount-and-blade2-coop.kvp" "$REPO/mount-and-blade2-coopupdates.json"; then exit 1; fi
+grep -Fx 'App.ExecutableWin=server\engine\dotnet\dotnet.exe' "$REPO/mount-and-blade2-coop.kvp" >/dev/null
+grep -Fx 'App.ExecutableLinux=/usr/bin/env' "$REPO/mount-and-blade2-coop.kvp" >/dev/null
+if grep '^App.CommandLineArgs=' "$REPO/mount-and-blade2-coop.kvp" | grep -Eq '\.(sh|ps1|bat)'; then exit 1; fi
 pass 'AMP manifests: masked password, no username/Python/base64, requested display name'
 
 cp "$REPO/mount-and-blade2-coop.sh" "$ROOT/mount-and-blade2-coop.sh"
 bash "$ROOT/mount-and-blade2-coop.sh" init
 prepare_config 4300
-jq -e '.port==4300 and .password=="" and .saveName=="saveauto1"' "$ROOT/data/server-config.json" >/dev/null
+jq -e '.port==4300 and .password=="" and .saveName=="saveauto1" and .steam==false' "$ROOT/data/server-config.json" >/dev/null
 pass 'first-run configuration'
 
 cat > "$ROOT/data/server-config.json" <<'JSON'
-{"saveName":"campaign-1","autosaveMinutes":7,"futureOption":42,"password":"p\"a\\ss,} | & $(touch SHOULD_NOT_EXIST)\nПривіт"}
+{"saveName":"campaign-1","autosaveMinutes":7,"futureOption":42,"steam":true,"password":"p\"a\\ss,} | & $(touch SHOULD_NOT_EXIST)\nПривіт"}
 JSON
 cp "$ROOT/data/server-config.json" "$WORK/amp-config.json"
 bash "$ROOT/mount-and-blade2-coop.sh" init
 cmp "$WORK/amp-config.json" "$ROOT/data/server-config.json"
 pass 'Update init creates the AutoMap target and preserves existing AMP settings'
 prepare_config 4400
-jq -e '.futureOption==42 and .port==4400 and .saveName=="campaign-1" and .autosaveMinutes==7' "$ROOT/data/server-config.json" >/dev/null
+jq -e '.futureOption==42 and .port==4400 and .saveName=="campaign-1" and .autosaveMinutes==7 and .steam==true' "$ROOT/data/server-config.json" >/dev/null
 jq -s -e '.[0].password==.[1].password' "$WORK/amp-config.json" "$ROOT/data/server-config.json" >/dev/null
 [[ ! -e SHOULD_NOT_EXIST ]]
 pass 'password quotes, backslashes, newline, Unicode and shell metacharacters survive JSON merge'
 
-jq '.password=""' "$ROOT/data/server-config.json" > "$WORK/blank.json"
+jq '.password="" | .steam=false' "$ROOT/data/server-config.json" > "$WORK/blank.json"
 mv "$WORK/blank.json" "$ROOT/data/server-config.json"
 prepare_config 4400
-jq -e '.password==""' "$ROOT/data/server-config.json" >/dev/null
+jq -e '.password=="" and .steam==false' "$ROOT/data/server-config.json" >/dev/null
 pass 'clearing password disables password protection'
 
 printf '{"saveName":"saveauto1","password":"stale","steam_username":"ignored"}\n' > "$ROOT/settings.json"
@@ -58,12 +62,14 @@ jq -e '.saveName=="dadada" and .password=="legacy" and .futureOption==42' "$ROOT
 pass 'stale legacy settings.json cannot overwrite values AMP wrote to server config'
 
 for invalid in 0 04200 65535 -1 '4200;echo bad'; do reject prepare_config "$invalid"; done
-reject start 4200 4201
+reject prepare 4200 4201 Coop
 pass 'invalid/overlapping allocations rejected'
 
 printf '{"saveName":"../../escape"}\n' > "$ROOT/data/server-config.json"
 reject prepare_config 4200
 printf '{"saveName":"safe","password":123}\n' > "$ROOT/data/server-config.json"
+reject prepare_config 4200
+printf '{"saveName":"safe","steam":"true"}\n' > "$ROOT/data/server-config.json"
 reject prepare_config 4200
 pass 'save traversal and non-string password rejected'
 
@@ -136,29 +142,38 @@ printf '#!/bin/bash\nprintf "ERROR! Download item failed\\n"\nexit 0\n' > "$ROOT
 reject update
 pass 'SteamCMD exit zero without download confirmation does not pass update'
 
-# Mock the Windows process boundary to inspect launch args without real game files.
+# Preparation must return to AMP rather than launch any game process.
 printf '{"saveName":"safe","password":"DO_NOT_LEAK_SERVER_PASSWORD"}\n' > "$ROOT/data/server-config.json"
 game=$(game_dir)
 mkdir -p "$game/engine/Modules/Coop" "$game/engine/bin/Win64_Shipping_Server" "$ROOT/.wine" "$ROOT/data/Game Saves" "$WORK/bin"
-printf '<Module>\n<Id value="CoopNightly" />\n</Module>\n' > "$game/engine/Modules/Coop/SubModule.xml"
+printf '<Module>\n<Id value="Coop" />\n</Module>\n' > "$game/engine/Modules/Coop/SubModule.xml"
 printf 'existing progress\n' > "$ROOT/data/Game Saves/safe.sav"
 touch "$ROOT/.wine/system.reg"
-for binary in wine wineboot wineserver script; do
-    printf '#!/bin/bash\nexit 0\n' > "$WORK/bin/$binary"
+stage_server
+for binary in wine wineboot wineserver socat xvfb-run; do
+    # shellcheck disable=SC2016 # The fixture expands COOP_CAPTURE when invoked.
+    printf '#!/bin/bash\ntouch "$COOP_CAPTURE"\nexit 99\n' > "$WORK/bin/$binary"
     chmod +x "$WORK/bin/$binary"
 done
-cat > "$WORK/bin/xvfb-run" <<'SH'
-#!/bin/bash
-printf '%s\n' "$@" > "$COOP_CAPTURE"
-printf '%s\n' "$BANNERLORD_USER_DIR" "$DOTNET_ROOT" >> "$COOP_CAPTURE"
-SH
-chmod +x "$WORK/bin/xvfb-run"
 export COOP_CAPTURE="$WORK/launch-args"
-(export PATH="$WORK/bin:$PATH"; start 4500 7210)
-grep -q 'stty -echo inlcr; exec' "$COOP_CAPTURE"
-grep -q 'CoopNightly' "$COOP_CAPTURE"
-if grep -q DO_NOT_LEAK_SERVER_PASSWORD "$COOP_CAPTURE"; then exit 1; fi
+(export PATH="$WORK/bin:$PATH"; prepare 4500 7210 Coop)
+[[ ! -f "$COOP_CAPTURE" ]]
 grep -q 'existing progress' "$ROOT/data/Game Saves/safe.sav"
 jq -e '.password=="DO_NOT_LEAK_SERVER_PASSWORD" and .port==4500' "$ROOT/data/server-config.json" >/dev/null
-pass 'launch keeps PTY/ports/module ID, preserves save and excludes password from argv'
+pass 'Pre-start preserves config/save and returns without launching the game'
+reject prepare 4500 7210 CoopNightly
+mv "$ROOT/server/.amp-coop-ready" "$WORK/ready-marker"
+reject prepare 4500 7210 Coop
+mv "$WORK/ready-marker" "$ROOT/server/.amp-coop-ready"
+pass 'incompatible module ID or incomplete staging fails before engine launch'
+
+mv "$ROOT/server/.amp-coop-managed" "$WORK/managed-marker"
+printf 'do not remove\n' > "$ROOT/server/unmanaged-file"
+reject stage_server
+test -f "$ROOT/server/unmanaged-file"
+mv "$WORK/managed-marker" "$ROOT/server/.amp-coop-managed"
+stage_server
+[[ ! -e "$ROOT/server/unmanaged-file" ]]
+grep -q 'existing progress' "$ROOT/data/Game Saves/safe.sav"
+pass 'Update refuses unmanaged server directories and only mirrors disposable application files'
 printf 'All %s shell checks passed\n' "$passed"

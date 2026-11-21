@@ -10,13 +10,15 @@ timeout 15 wineserver -k
 timeout 15 wineserver -w
 test -f "$WINEPREFIX/system.reg"
 printf 'WINE_PREFIX_OK\n'
-printf '@echo off\r\necho WINE_READY\r\nset /p command=\r\nif "%%command%%"=="stop" (echo WINE_STOP_OK & exit /b 7)\r\nexit /b 9\r\n' > "$WORK/console.cmd"
-printf -v command '%q ' wine cmd /c "Z:${WORK//\//\\}\\console.cmd"
+mkdir -p "$WORK/instance/server/engine/bin/Win64_Shipping_Server" "$WORK/instance/data"
+printf '{}\n' > "$WORK/instance/data/server-config.json"
+printf '@echo off\r\nif not exist "%%BANNERLORD_USER_DIR%%/server-config.json" exit /b 9\r\necho DATA_PATH_OK\r\necho WINE_READY\r\nset /p command=\r\nif "%%command%%"=="stop" (echo WINE_STOP_OK & exit /b 0)\r\nexit /b 9\r\n' > "$WORK/instance/server/engine/bin/Win64_Shipping_Server/console.cmd"
+cd "$WORK/instance/server/engine/bin/Win64_Shipping_Server"
 # Keep stdin open until Wine has opened its console, like AMP's live console.
 mkfifo "$WORK/input"
 exec 3<> "$WORK/input"
-export SHELL=/bin/bash
-timeout 90 xvfb-run -a script --quiet --return --command "stty -echo inlcr; exec $command" /dev/null \
+timeout 90 env "BANNERLORD_USER_DIR=Z:$WORK/instance/data" "COOP_DATA_DIR=Z:$WORK/instance/data" \
+  xvfb-run -a socat STDIO 'EXEC:/usr/bin/wine cmd /c console.cmd,pty,setsid,ctty,echo=0,inlcr' \
   < "$WORK/input" > "$WORK/output" 2>&1 &
 child=$!
 ready=false
@@ -33,6 +35,7 @@ status=$?
 set -e
 exec 3>&-
 cat "$WORK/output"
-[[ "$status" == 7 ]]
+[[ "$status" == 0 ]]
+grep -q DATA_PATH_OK "$WORK/output"
 grep -q WINE_STOP_OK "$WORK/output"
-printf 'WINE_STDIO_STOP_AND_EXIT_STATUS_OK\n'
+printf 'DIRECT_WINE_DATA_PATH_AND_STOP_OK\n'

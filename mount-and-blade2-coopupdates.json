@@ -1,6 +1,6 @@
 [
     {
-        "UpdateStageName":  "Download shell runtime",
+        "UpdateStageName":  "Download Linux preparation helper",
         "UpdateSourcePlatform":  "Linux",
         "UpdateSource":  "FetchURL",
         "UpdateSourceData":  "https://raw.githubusercontent.com/ZifeRRoT/MnB-Bannerlord-co-op-AMP-template/main/mount-and-blade2-coop.sh",
@@ -10,27 +10,53 @@
         "SkipOnFailure":  false
     },
     {
-        "UpdateStageName": "Create server config for AMP AutoMap",
-        "UpdateSourcePlatform": "Linux",
-        "UpdateSource": "Executable",
-        "UpdateSourceData": "/bin/bash",
-        "UpdateSourceArgs": "\"{{$FullRootDir}}mount-and-blade2-coop.sh\" init",
-        "SkipOnFailure": false
+        "UpdateStageName":  "Download Windows preparation helper",
+        "UpdateSourcePlatform":  "Windows",
+        "UpdateSource":  "FetchURL",
+        "UpdateSourceData":  "https://raw.githubusercontent.com/ZifeRRoT/MnB-Bannerlord-co-op-AMP-template/main/mount-and-blade2-coop.ps1",
+        "UpdateSourceTarget":  "{{$FullRootDir}}",
+        "UpdateSourceArgs":  "mount-and-blade2-coop.ps1",
+        "OverwriteExistingFiles":  true,
+        "SkipOnFailure":  false
+    },
+    {
+        "UpdateStageName":  "Create server config for AMP AutoMap",
+        "UpdateSourcePlatform":  "Linux",
+        "UpdateSource":  "Executable",
+        "UpdateSourceData":  "/bin/bash",
+        "UpdateSourceArgs":  "\"{{$FullRootDir}}mount-and-blade2-coop.sh\" init",
+        "SkipOnFailure":  false
+    },
+    {
+        "UpdateStageName":  "Create server config for AMP AutoMap",
+        "UpdateSourcePlatform":  "Windows",
+        "UpdateSource":  "Executable",
+        "UpdateSourceData":  "powershell.exe",
+        "UpdateSourceArgs":  "-NoProfile -ExecutionPolicy Bypass -File \"{{$FullRootDir}}mount-and-blade2-coop.ps1\" -Action init",
+        "SkipOnFailure":  false
     },
     {
         "UpdateStageName":  "Steam login through AMP",
-        "UpdateSourcePlatform":  "Linux",
+        "UpdateSourcePlatform":  "All",
         "UpdateSource":  "SteamCMD",
         "UpdateSourceData":  "228980",
         "ForceDownloadPlatform":  "Windows",
         "SkipOnFailure":  false
     },
     {
-        "UpdateStageName":  "Update Co-op Workshop files",
+        "UpdateStageName":  "Update and stage Linux server files",
         "UpdateSourcePlatform":  "Linux",
         "UpdateSource":  "Executable",
         "UpdateSourceData":  "/bin/bash",
         "UpdateSourceArgs":  "\"{{$FullRootDir}}mount-and-blade2-coop.sh\" update",
+        "SkipOnFailure":  false
+    },
+    {
+        "UpdateStageName":  "Update and stage Windows server files",
+        "UpdateSourcePlatform":  "Windows",
+        "UpdateSource":  "Executable",
+        "UpdateSourceData":  "powershell.exe",
+        "UpdateSourceArgs":  "-NoProfile -ExecutionPolicy Bypass -File \"{{$FullRootDir}}mount-and-blade2-coop.ps1\" -Action update",
         "SkipOnFailure":  false
     }
 ]

@@ -19,8 +19,9 @@ settings() {
     jq -e 'type == "object" and
       ((.saveName // "saveauto1") | type == "string" and test("^[A-Za-z0-9_-]{1,80}$")) and
       ((.autosaveMinutes // 5) | type == "number" and floor == . and . >= 1 and . <= 1440) and
+      ((has("steam") | not) or (.steam | type == "boolean")) and
       ((has("password") | not) or (.password | type == "string"))' \
-      "$ROOT/data/server-config.json" >/dev/null || die 'Invalid data/server-config.json; check save name, autosave and password type'
+      "$ROOT/data/server-config.json" >/dev/null || die 'Invalid data/server-config.json; check save name, autosave, Steam flag and password type'
 }
 
 check_port() {
@@ -122,8 +123,26 @@ update() {
         die 'SteamCMD did not confirm the Workshop download; existing files were left in place'
     fi
     rm -f -- "$output"
-    game_dir >/dev/null
+    stage_server
     log 'Workshop update finished'
+}
+
+stage_server() {
+    local game target="$ROOT/server"
+    game=$(game_dir)
+    # This is a disposable copy of application files, never the persistent data
+    # directory. Refuse symlinks/unmanaged destinations before deleting anything.
+    [[ ! -L "$target" ]] || die 'Refusing a symlink as staged server directory'
+    if [[ -e "$target" && ! -f "$target/.amp-coop-managed" ]]; then
+        die 'server/ is not managed by this template; move it aside before Update'
+    fi
+    mkdir -p -- "$target"
+    touch "$target/.amp-coop-managed"
+    rm -f -- "$target/.amp-coop-ready"
+    find "$target" -mindepth 1 -maxdepth 1 ! -name .amp-coop-managed -exec rm -rf -- {} +
+    cp -a -- "$game/." "$target/"
+    [[ -f "$target/engine/dotnet/dotnet.exe" ]] || die 'Staged .NET engine is missing'
+    touch "$target/.amp-coop-ready"
 }
 
 prepare_config() {
@@ -137,7 +156,7 @@ prepare_config() {
     temporary=$(mktemp "$data/.server-config.XXXXXX")
     if ! jq --argjson port "$port" '
       . + {port:$port, saveName:(.saveName // "saveauto1"),
-        autosaveMinutes:(.autosaveMinutes // 5), logFile:true, steam:false,
+        autosaveMinutes:(.autosaveMinutes // 5), logFile:true, steam:(.steam // false),
         password:(.password // "")}
       ' "$old" > "$temporary"; then
         rm -f -- "$temporary"
@@ -147,14 +166,14 @@ prepare_config() {
     mv -f -- "$temporary" "$old"
 }
 
-start() {
-    local port=$1 engine=$2 game data name mid token command binary
+prepare() {
+    local port=$1 engine=$2 expected=$3 game="$ROOT/server" data name mid binary
     check_port "$port" 65534; check_port "$engine"
     (( engine != port && engine != port+1 )) || die 'Engine port overlaps Co-op ports'
-    for binary in wine wineboot wineserver xvfb-run script timeout; do
+    for binary in wine wineboot wineserver xvfb-run socat timeout; do
         command -v "$binary" >/dev/null || die "Missing container dependency: $binary"
     done
-    game=$(game_dir)
+    [[ -f "$game/.amp-coop-managed" && -f "$game/.amp-coop-ready" && -f "$game/engine/dotnet/dotnet.exe" ]] || die 'Complete Update to stage the server before Start'
     prepare_config "$port"
     data="$ROOT/data"
     name=$(jq -r '.saveName // "saveauto1"' "$data/server-config.json")
@@ -172,17 +191,10 @@ start() {
         timeout 15 wineserver -w
         [[ -f "$WINEPREFIX/system.reg" ]] || die 'Wine registry missing after initialization'
     fi
-    export BANNERLORD_USER_DIR="Z:${data//\//\\}" COOP_DATA_DIR="Z:${data//\//\\}"
-    export DOTNET_ROOT="Z:${game//\//\\}\\engine\\dotnet" DOTNET_MULTILEVEL_LOOKUP=0
     mid=$(sed -n 's/.*<Id[[:space:]]*value="\([A-Za-z0-9_.-]*\)".*/\1/p' "$game/engine/Modules/Coop/SubModule.xml" | head -n 1)
     [[ "$mid" =~ ^[A-Za-z0-9_.-]+$ ]] || die 'Cannot read Coop module Id'
-    token="_MODULES_*Native*SandBoxCore*Sandbox*$mid*DedicatedServer.Windows*_MODULES_"
-    cd -- "$game/engine/bin/Win64_Shipping_Server"
-    # %q quotes only paths/module names/ports. Password stays in JSON on disk.
-    printf -v command '%q ' wine "$game/engine/dotnet/dotnet.exe" TaleWorlds.Starter.DotNetCore.dll \
-        "$token" /dedicatedcustomserver "$engine" EU 0
-    export SHELL=/bin/bash
-    exec xvfb-run -a script --quiet --return --command "stty -echo inlcr; exec $command" /dev/null
+    [[ "$expected" =~ ^[A-Za-z0-9_.-]+$ && "$mid" == "$expected" ]] || die "Installed module is $mid; template CoopModuleId must match it before Start"
+    log 'Pre-start preparation complete; AMP will launch the engine directly'
 }
 
 main() {
@@ -190,8 +202,8 @@ main() {
     case "${1:-}" in
         update) update ;;
         init) settings ;;
-        start) [[ $# == 3 ]] || die 'Usage: mount-and-blade2-coop.sh start GAME_PORT ENGINE_PORT'; start "$2" "$3" ;;
-        *) die 'Usage: mount-and-blade2-coop.sh init|update|start GAME_PORT ENGINE_PORT' ;;
+        prepare) [[ $# == 4 ]] || die 'Usage: mount-and-blade2-coop.sh prepare GAME_PORT ENGINE_PORT MODULE_ID'; prepare "$2" "$3" "$4" ;;
+        *) die 'Usage: mount-and-blade2-coop.sh init|update|prepare GAME_PORT ENGINE_PORT MODULE_ID' ;;
     esac
 }
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then main "$@"; fi
