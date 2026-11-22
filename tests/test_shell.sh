@@ -35,14 +35,15 @@ if grep -E '^App\.(ExecutableWin|WindowsCommandLineArgs)=' "$REPO/mount-and-blad
 jq -e 'length == 1 and all(.[]; .UpdateSourcePlatform == "Linux" and .UpdateSourceData == "/bin/bash")' \
   "$REPO/mount-and-blade2-coopstart.json" >/dev/null
 [[ ! -e "$REPO/mount-and-blade2-coop.ps1" && ! -e "$REPO/tests/test_windows.ps1" ]]
-grep -Fx 'App.ExecutableLinux=/usr/bin/env' "$REPO/mount-and-blade2-coop.kvp" >/dev/null
+grep -Fx 'App.ExecutableLinux=/bin/bash' "$REPO/mount-and-blade2-coop.kvp" >/dev/null
+grep -F 'mount-and-blade2-coop.sh" start {{CoopModuleId}}' "$REPO/mount-and-blade2-coop.kvp" >/dev/null
 if grep '^App.CommandLineArgs=' "$REPO/mount-and-blade2-coop.kvp" | grep -Eq '\.(sh|ps1|bat)'; then exit 1; fi
 sed -n 's/^App.EnvironmentVariables=//p' "$REPO/mount-and-blade2-coop.kvp" | jq -e '.DS_ACCEPT_EULA == "{{AcceptEULA}}"' >/dev/null
 sed -n 's/^App.EnvironmentVariables=//p' "$REPO/mount-and-blade2-coop.kvp" | jq -e \
   'has("BANNERLORD_USER_DIR") == false and has("COOP_DATA_DIR") == false and has("DOTNET_ROOT") == false' >/dev/null
 jq -e 'length == 1 and .[0].Ref == "GamePort" and .[0].Port == 4200 and .[0].Protocol == "UDP" and (.[0] | has("ChildPorts") == false)' \
   "$REPO/mount-and-blade2-coopports.json" >/dev/null
-grep -Fx 'Meta.ConfigVersion=1' "$REPO/mount-and-blade2-coop.kvp" >/dev/null
+grep -Fx 'Meta.ConfigVersion=2' "$REPO/mount-and-blade2-coop.kvp" >/dev/null
 grep -E '^Meta.ReleaseNotes=.' "$REPO/mount-and-blade2-coop.kvp" >/dev/null
 sed -n 's/^App.AppSettings=//p' "$REPO/mount-and-blade2-coop.kvp" | jq -e '.CoopModuleId == "Coop" and (has("CoopEnginePort") == false)' >/dev/null
 jq -e '.[0].UpdateSourceArgs | endswith(" prepare {{$GamePort}} {{CoopModuleId}}")' "$REPO/mount-and-blade2-coopstart.json" >/dev/null

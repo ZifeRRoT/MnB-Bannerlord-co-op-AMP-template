@@ -32,9 +32,10 @@ Meta.SpecificDockerImage to
 Workshop content and the SteamCMD bootstrap are also mutable; keep a local backup
 for rollback.
 
-Preparation uses mount-and-blade2-coop.sh, which exits before the game starts.
-Startup uses the standard env/xvfb-run/socat/Wine executables in Linux Docker;
-no custom scripts are called during startup. Native Windows support was removed
+Preparation uses mount-and-blade2-coop.sh and returns to AMP before startup.
+The private template now also calls its start action to run the standard
+env/xvfb-run/socat/Wine executables and translate player telemetry for AMP.
+Native Windows support was removed
 during private-template development; the new upstream submission starts at ConfigVersion 1. Docker is recommended; running directly on a Linux host
 without a container has not been tested.
 No Python or base64 is used. This standalone repository retrieves its helper from
@@ -100,3 +101,24 @@ the Starter DLL and Co-op module token. Client connections, Steam advertising,
 and AMP process monitoring after this change remain unverified. The actual
 game tests required a Linux filesystem in this environment; control launches
 directly from Windows bind mounts failed before normal startup.
+
+## AMP player tracking
+
+The user supplied real first-character, disconnect, and reconnect logs. Player
+snapshots are `@DS@` JSON with ev=players and list entries containing peer id,
+name, state, and address. Names first appear during loading; a reconnect receives
+a new peer ID. Explicit disconnect lines identify only the peer, and the next
+snapshot removes it from the list.
+
+The installed AMP 2.8.0.10 GenericModule was inspected: UserJoinRegex creates a
+SimpleUser from username/userid/endpoint, rejects duplicates by name or ID, and
+does not update existing users. UserLeaveRegex can remove users by ID. The
+console configuration has no complete-JSON-roster setting. MetricsRegex exposes
+named numeric groups as extra metrics, rather than changing the user list.
+
+The private Bash helper now runs a jq stdout bridge that reconciles snapshots
+and adds one synthetic line per join/leave. This permits multiple players in a
+single snapshot without relying on one regex match to process an entire JSON
+array. Original server lines and ANSI codes are preserved. Startup command
+input remains connected to socat/Wine; the adapter only processes output.
+The public AMPTemplates submission is not modified by this change.

@@ -2,8 +2,9 @@
 
 An experimental Generic template for Linux amd64. Docker is recommended.
 The Docker setup uses one `cubecoders/ampbase:wine-stable` container with Xvfb,
-socat PTY, and Wine. No custom Dockerfile is needed. Bash runs only during
-Update and Pre-start, then exits; the startup command does not invoke the helper.
+socat PTY, and Wine. No custom Dockerfile is needed. The Bash helper prepares
+updates and saves; at startup it runs Wine with a jq console bridge for AMP
+player tracking. Console commands still go directly to the engine through socat.
 No Python or base64 is used. Native Windows AMP is not supported.
 
 Local shell tests and a Wine smoke test check preparation and console handling
@@ -155,10 +156,10 @@ in a real AMP deployment. You can change an existing instance's friendly name
 separately.
 
 The data directory remains **bannerlord-coop/**: saves, the Wine prefix, and the
-cache are not moved. The new AMPTemplates submission starts at ConfigVersion 1,
-independently of earlier private-template versions. Linux remains the only runtime
-platform and Docker is recommended. Refresh existing private instances manually;
-the reset version is not an automatic upgrade signal.
+cache are not moved. This standalone template uses ConfigVersion 2 for player
+tracking and the console bridge. Linux remains the only runtime platform and
+Docker is recommended. Older private versions used a different version sequence;
+refresh existing instances manually rather than relying on automatic detection.
 Refresh Configuration on an existing Linux instance. A native Windows instance
 cannot become a Linux instance through this change: create a separate Linux/Docker
 instance and import the campaign while the game is stopped.
@@ -199,8 +200,9 @@ login or download failure.
 
 Pre-start validates configuration, ports, and module ID, creates a missing save,
 initializes the Wine prefix, then returns control to AMP.
-Linux startup uses the standard chain
-`env → xvfb-run → socat EXEC → Wine → bundled dotnet.exe`.
+Linux startup uses the helper to run
+`env → xvfb-run → socat EXEC → Wine → bundled dotnet.exe`, with stdout passed
+through the jq player bridge. The helper does not interpret commands from stdin.
 The command executed under Wine, from WorkingDir, is:
 
 ```text
@@ -208,7 +210,8 @@ The command executed under Wine, from WorkingDir, is:
 ```
 
 socat provides a PTY with echo=0 and inlcr; EXEC does not use a shell for the
-engine. Startup does not call our .sh helper. The password is absent from the
+engine. The private template uses its .sh helper at startup for player tracking.
+The password is absent from the
 command line.
 
 The physical WorkingDir is `server/engine/bin/Win64_Shipping_Server`.
@@ -217,6 +220,33 @@ to absolute Wine paths Z:/… before launching Xvfb. This does not depend on cwd
 changes inside the game. Windows engine binaries remain necessary for Wine.
 MonitorChildProcessName matches dotnet, the Starter DLL, and the Co-op module token.
 Additional Workshop mods are not supported yet.
+
+### Player tracking in AMP
+
+The server emits `@DS@` JSON snapshots containing every connected peer. AMP
+GenericModule expects individual join and leave events, so the helper forwards
+the original console lines and adds `[AMP-Coop]` events for its configured regexes.
+This bridge belongs to this standalone template; the public template is not changed.
+
+- A player appears in AMP when a snapshot first supplies their name, including
+  the loading phase. Handshake and character creation placeholders are excluded.
+- Repeated loading/on-map snapshots do not create duplicate users. A tracked
+  player stays online while their peer remains present in the roster.
+- An explicit disconnect removes the player by peer ID. A later snapshot also
+  removes absent peers if a disconnect line was missed. EOF clears the roster.
+- Reconnecting uses the new peer ID. These session IDs are not Steam IDs.
+- Identical names receive a stable `[peer N]` suffix when needed because AMP
+  GenericModule otherwise deduplicates users by name as well as ID.
+- `Connected Peers` is a separate pulse-derived metric that includes unnamed
+  connections still doing a handshake or creating a character.
+
+JSON names are decoded, wrapped snapshots are reassembled, and malformed snapshots
+leave the last valid roster intact. Original output, including ANSI codes, remains
+visible. Only generated AMP event fields replace control characters with spaces.
+
+After publishing these changes, run Fetch Latest → Refresh Configuration → Update,
+then Stop → Start. Both the new helper and the new console regex settings are
+required. AMP UI verification on the actual game server is still needed.
 
 ## Data and backups
 
@@ -270,6 +300,7 @@ Local requirements: Bash, jq, awk, and standard Unix tools.
 
 ```bash
 bash tests/test_shell.sh
+bash tests/test_players.sh
 ```
 
 From the repository root on Linux with Docker:
@@ -281,13 +312,19 @@ docker run --rm --platform linux/amd64 --entrypoint /bin/bash \
 
 docker run --rm --platform linux/amd64 --entrypoint /bin/bash \
   --mount "type=bind,source=$PWD,target=/work,readonly" -w /work \
+  cubecoders/ampbase:wine-stable tests/test_players.sh
+
+docker run --rm --platform linux/amd64 --entrypoint /bin/bash \
+  --mount "type=bind,source=$PWD,target=/work,readonly" -w /work \
   cubecoders/ampbase:wine-stable tests/container_smoke.sh
 ```
 
 Tests cover password/JSON handling, synthetic cache data, ports, staging, save
 preservation, and ensuring Pre-start returns without launching the game. The
 Wine smoke test runs Windows cmd through the same xvfb-run/socat chain and checks
-the data path and stop input. It does not launch the game.
+the data path, player bridge, and stop input. It does not launch the game.
+Player tests cover new characters, reconnects, multiple peers, duplicate names,
+wrapped/malformed snapshots, and startup stdin/exit behavior.
 
 The PR bot reported successful Workshop installation (about 6.5 GB), Ready,
 UDP 4200 listening, a world save on clean Stop, and password/save name/autosave/
