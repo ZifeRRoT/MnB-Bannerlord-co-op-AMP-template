@@ -1,15 +1,15 @@
 # Mount & Blade II: Bannerlord Co-op для AMP
 
-Експериментальний Generic template для Windows x64 та Ubuntu/Debian amd64.
-Windows запускає bundled dotnet.exe напряму. Linux використовує один контейнер
-`cubecoders/ampbase:wine-stable`, Xvfb, socat PTY та Wine. Власний Dockerfile
-не потрібен. Bash/PowerShell працюють лише в Update та Pre-start, після чого
-завершуються; startup-команда не викликає наші скрипти. Python та base64 відсутні.
+Експериментальний Generic template для Linux amd64. Docker рекомендований.
+У Docker використовується один контейнер `cubecoders/ampbase:wine-stable`, Xvfb, socat PTY
+та Wine. Власний Dockerfile не потрібен. Bash працює лише в Update та Pre-start,
+після чого завершується; startup-команда не викликає наші скрипти.
+Python та base64 відсутні. Нативний Windows AMP не підтримується.
 
-Це кандидат на кросплатформний шаблон, а не підтверджений внесок до AMPTemplates.
-Реальне Workshop-завантаження, досягнення Ready, підключення гравців і Stop зі
-збереженням кампанії ще потребують перевірки в AMP на обох ОС. Локальні тести
-на Windows і Linux перевіряють підготовку та консоль на тестових executable.
+Локальні shell-тести та Wine smoke перевіряють підготовку й консоль на тестовому
+executable. Реальний Linux/Docker запуск із Ready, підключенням гравців і Stop
+зі збереженням кампанії ще потребує перевірки. Це окремий Linux-шаблон, а не
+кандидат на кросплатформне подання до AMPTemplates.
 
 ## Підключення
 
@@ -21,15 +21,17 @@ ZifeRRoT/MnB-Bannerlord-co-op-AMP-template:main
 
 Натисніть Fetch Latest, оновіть браузер і знайдіть у Create Instance
 **Mount & Blade II: Bannerlord Co-op**. Префікс Community прибрано.
-На Linux Docker залиште увімкненим. У Wine-образі перевірено Bash, jq, Wine,
-wineboot, wineserver, Xvfb, xauth, socat і timeout. Windows-гілка призначена
-для нативного Windows AMP без Linux-контейнера; потрібен Windows PowerShell 5.1.
+Docker рекомендований. У Wine-образі перевірено Bash, jq, Wine,
+wineboot, wineserver, Xvfb, xauth, socat і timeout.
+Для запуску без Docker ці залежності потрібно встановити на Linux-хості;
+Wine очікується за шляхом `/usr/bin/wine`, Xvfb wrapper — `/usr/bin/xvfb-run`,
+socat — `/usr/bin/socat`. Нативний запуск без контейнера ще не перевірено.
 Окремий .NET runtime завантажувати не потрібно: engine містить власний.
 
 Файли: `manifest.json`, `mount-and-blade2-coop.kvp`,
 `mount-and-blade2-coopconfig.json`, `mount-and-blade2-coopmetaconfig.json`,
 `mount-and-blade2-coopports.json`, `mount-and-blade2-coopupdates.json`,
-`mount-and-blade2-coopstart.json`, `mount-and-blade2-coop.sh`, `mount-and-blade2-coop.ps1`.
+`mount-and-blade2-coopstart.json`, `mount-and-blade2-coop.sh`.
 
 Для локальної перевірки знайдіть справжній DeploymentTemplates вашого ADS через
 `ampinstmgr list` та `find /home/amp /opt -type d -name DeploymentTemplates`.
@@ -62,14 +64,14 @@ Register server in Steam вмикає Steam advertising лише коли Steam 
 самому запущеному engine. Кеш SteamCMD використовується для завантажень і сам
 не створює runtime Steam-сеанс. У Docker з одним SteamCMD видимість у Steam
 не гарантована; реальну реєстрацію ще треба перевірити. Для вимкнення зніміть
-позначку й перезапустіть гру. Pre-start на обох ОС зберігає вибране true/false.
+позначку й перезапустіть гру. Pre-start зберігає вибране true/false.
 
 ### EULA без вводу в консоль
 
 Після Update прочитайте `server/EULA.md` (або EULA.txt) та `server/LICENSE.txt`
 у File Manager. Якщо погоджуєтеся, увімкніть **Accept server EULA** й виконайте
 Stop → Start. AMP передасть підтримувану сервером змінну `DS_ACCEPT_EULA=true`
-на Windows і Linux/Wine. Прийняття сервер записує сам у `data/eula.txt`; template
+у Linux/Wine. Прийняття сервер записує сам у `data/eula.txt`; template
 цей файл не підробляє й не надсилає `yes` у stdin. Умови після оновлень можуть
 змінюватися: переглядайте їх перед Start, якщо опція залишена увімкненою.
 
@@ -82,9 +84,9 @@ Stop → Start. AMP передасть підтримувану сервером
 Потрібен Steam-акаунт із Bannerlord (`261550`). Натисніть Update і пройдіть
 Steam login/пароль/Guard у штатному діалозі AMP, а не в Console.
 
-На кожній ОС Update виконує чотири відповідні етапи:
+Update виконує чотири етапи:
 
-1. FetchURL завантажує Linux .sh або Windows .ps1 helper із цього репозиторію.
+1. FetchURL завантажує shell helper із цього репозиторію.
 2. Helper init створює data/server-config.json, якщо його немає. AutoMap потребує
    файла-шаблону до запуску гри. Наявний файл init не перезаписує.
 3. Штатний SteamCMD stage 228980 (Common Redistributables) проводить авторизацію
@@ -93,44 +95,11 @@ Steam login/пароль/Guard у штатному діалозі AMP, а не �
    копіює DedicatedServer у фізичний `server/`. Stdin закритий,
    NoPromptForPassword=1, timeout — 2 години.
 
-Linux використовує кеш `../.virtualhome/Steam/config/config.vdf`, Windows —
-`config/config.vdf` поруч зі steamcmd.exe. Це шляхи з upstream-шаблону Project
-Reclaimer; їхню відповідність вашій інсталяції AMP треба перевірити.
-Windows helper показує heartbeat завантаження й друкує SteamCMD-вивід після
-завершення процесу. Пароль/Guard вводяться лише в штатному діалозі AMP.
+Кеш SteamCMD розташований у `../.virtualhome/Steam/config/config.vdf`.
+Це шлях з upstream-шаблону Project Reclaimer; його відповідність вашій
+інсталяції AMP треба перевірити. Пароль/Guard вводяться у штатному діалозі AMP.
 
-### Windows: незрозумілий вивід і відсутній Steam cache
-
-На одному реальному Windows AMP 2.8.0.10 введення логіна/пароля не завершилося
-Steam Guard, а штатний SteamCMD-етап показав розсипаний текст. Після цього
-config/config.vdf містив лише початкові дані без Accounts/ConnectCache, тому
-наш helper правильно зупинив Workshop download. Створений config.vdf ще не
-доводить успішний вхід. Точну причину всередині AMP наразі не встановлено.
-
-Окрему копію того самого SteamCMD перевірено з +quit і з анонімним входом:
-код завершення 0, Steam API та Steam Public OK, без binary/environment dump.
-Це звужує проблему до штатного шляху авторизації AMP, але не є перевіркою
-входу в реальний Steam-акаунт.
-
-Разовий обхід — інтерактивний SteamCMD у каталозі **цього** інстансу. У звичайному
-PowerShell, під тим самим Windows-користувачем, що запускає AMP:
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\AMPDatastore\Instances\test01\bannerlord-coop\mount-and-blade2-coop.ps1' -Action login
-```
-
-Підставте свій фактичний шлях. У Steam> введіть `login YOUR_STEAM_LOGIN`, пароль
-вводьте лише в password prompt SteamCMD, пройдіть Guard, потім введіть `quit`.
-Пароль не передається в argv і не зберігається helper. SteamCMD сам створює
-кеш у цьому інстансі. Після цього повторіть Update в AMP. Якщо штатний етап
-AMP знову перешкоджає оновленню, наступна діагностика потрібна саме цьому етапу;
-не переносіть кеш інших інстансів і не надсилайте config.vdf у чат.
-
-Для вже встановленого helper без -Action login можна запустити сам
-`steamcmd.exe` з тієї ж папки вручну; команди Steam> такі самі. Цей спосіб є
-тимчасовим обходом, а не підтвердженням виправлення Windows login у AMP.
-
-Окрема копія `server/` дає обом ОС стабільний executable та WorkingDir без
+Окрема копія `server/` дає стабільний executable та WorkingDir без
 динамічного shell-launcher. Вона займає приблизно ще один обсяг dedicated build
 понад Workshop-копію (поточний Workshop — близько 6.5 GB). Перед Update потрібне
 місце для обох копій, Wine prefix на Linux і backup. Helper очищає тільки
@@ -170,7 +139,10 @@ AppConfigId збережено. Через перейменування файл
 реальному AMP. Friendly name наявного інстансу можна змінити окремо.
 
 Каталог даних залишається **bannerlord-coop/**: сейви, Wine prefix і кеш не
-переміщуються. ConfigVersion 8 додає Windows, Pre-start і прямий запуск engine.
+переміщуються. ConfigVersion 12 залишає лише Linux і рекомендує Docker.
+Для наявного Linux-інстансу виконайте Refresh Configuration. Нативний Windows-інстанс
+не перетворюється на Linux-інстанс: для перенесення створіть окремий Linux/Docker
+інстанс і імпортуйте кампанію при зупиненій грі.
 Після Refresh обов'язково виконайте Update для створення `server/` перед Start.
 Старий runtime.py новий KVP не використовує.
 
@@ -203,15 +175,14 @@ AMP Stop надсилає stop і чекає 180 секунд. Реальне з
 
 Pre-start перевіряє конфігурацію/порти/module ID, створює відсутній сейв і
 ініціалізує Wine prefix на Linux, потім повертає керування AMP.
-Windows startup: bundled `server/engine/dotnet/dotnet.exe`.
 Linux startup: стандартний `env → xvfb-run → socat EXEC → Wine → bundled dotnet.exe`.
 socat надає PTY із echo=0 та inlcr; EXEC не використовує shell для engine.
-У startup немає викликів наших .sh/.ps1. Пароля в командному рядку немає.
+У startup немає викликів нашого .sh. Пароля в командному рядку немає.
 
-Обидві ОС мають фізичний WorkingDir `server/engine/bin/Win64_Shipping_Server`.
-На Windows BANNERLORD_USER_DIR, COOP_DATA_DIR та DOTNET_ROOT задаються абсолютними
-шляхами AMP. На Linux стандартний env executable перевизначає їх абсолютними
-Wine-шляхами Z:/… перед запуском Xvfb. Це не залежить від зміни cwd усередині гри.
+Фізичний WorkingDir — `server/engine/bin/Win64_Shipping_Server`.
+Стандартний env executable задає BANNERLORD_USER_DIR, COOP_DATA_DIR та DOTNET_ROOT
+абсолютними Wine-шляхами Z:/… перед запуском Xvfb. Це не залежить від зміни cwd
+усередині гри. Windows-бінарні файли engine потрібні для Wine й залишаються.
 MonitorChildProcessName прив'язаний до dotnet/Starter та окремого EnginePort.
 Додаткові Workshop-моди поки не підтримуються.
 
@@ -225,7 +196,6 @@ MonitorChildProcessName прив'язаний до dotnet/Starter та окре�
 | bannerlord-coop/server/ | Керована копія executable/engine; Update її замінює |
 | bannerlord-coop/.wine/ | Wine prefix |
 | .virtualhome/Steam/ | Linux: приватний кеш Steam і можливі Workshop-файли |
-| bannerlord-coop/config/ | Windows: приватний кеш SteamCMD |
 | bannerlord-coop/workshop/ | Нові Workshop-файли |
 | bannerlord-coop/steam/ | Старе розміщення, якщо вже встановлювали раніше |
 
@@ -261,31 +231,12 @@ tar -xzf "$BACKUP_FILE" -C "$INSTANCE_DIR"
 
 Відновлюйте runtime, template, engine і дані з відповідних ревізій разом.
 
-На Windows для backup після зупинки гри можна використати вбудований tar.exe:
-
-```powershell
-$instancePath = Read-Host 'Absolute AMP instance directory'
-if (-not (Test-Path -LiteralPath (Join-Path $instancePath 'bannerlord-coop'))) { throw 'Instance not found' }
-$backupPath = Join-Path $env:USERPROFILE ('bannerlord-coop-' + (Get-Date -Format yyyyMMdd-HHmmss) + '.tar.gz')
-tar.exe -czf $backupPath -C $instancePath bannerlord-coop
-if ($LASTEXITCODE -ne 0) { throw 'Backup failed' }
-```
-
-Windows-кеш входу вже входить у цей каталог. Відновлення виконуйте лише при
-зупиненому інстансі, зберігши поточний каталог поруч для можливості відкату.
-
 ## Перевірки
 
 Локально потрібні Bash, jq, awk і стандартні Unix tools:
 
 ```bash
 bash tests/test_shell.sh
-```
-
-На Windows (нативний Windows PowerShell):
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/test_windows.ps1
 ```
 
 На Linux Docker з кореня репозиторію:
@@ -300,15 +251,11 @@ docker run --rm --platform linux/amd64 --entrypoint /bin/bash \
 ```
 
 Тести перевіряють пароль/JSON, кеш на штучних даних, порти, staging, збереження
-сейву та відсутність запуску гри з Pre-start. Windows-тести додатково компілюють
-тимчасовий тестовий console executable для перевірки реального process/stdin
-і абсолютного шляху даних. Wine smoke запускає Windows cmd через той самий
-xvfb-run/socat ланцюжок і перевіряє шлях до data та stop. Це не запуск гри.
+сейву та відсутність запуску гри з Pre-start. Wine smoke запускає Windows cmd
+через той самий xvfb-run/socat ланцюжок і перевіряє шлях до data та stop.
+Це не запуск гри.
 
-Локально пройшли 18 Linux shell-перевірок та 24 Windows-перевірки.
-Wine smoke повернув WINE_PREFIX_OK та DIRECT_WINE_DATA_PATH_AND_STOP_OK.
-
-До подання в офіційний AMPTemplates на **кожній ОС** ще потрібно підтвердити:
+Для підтвердження роботи Linux/Docker ще потрібно перевірити:
 
 - Template видно, Update із реальним Steam Guard/Workshop успішний.
 - Start доходить до справжнього Ready; клієнт підключається.

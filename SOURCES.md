@@ -1,4 +1,4 @@
-# Джерела та межі перевірки — 21.11.2026
+# Джерела та межі перевірки — 22.11.2026
 
 - [AMP Generic wiki](https://github.com/CubeCoders/AMP/wiki/Configuring-the-%27Generic%27-AMP-module): manifest, Git/LOCAL repositories, Executable update stage, STDIO/ExitMethod.
 - [AMP custom images](https://github.com/CubeCoders/AMP/wiki/Using-custom-Docker-images-with-AMP-and-the-generic-module): base image та bind mount `/AMP`.
@@ -29,33 +29,29 @@ xvfb-run, xauth, socat, wineboot, wineserver. SteamCMD у PATH немає;
 `cubecoders/ampbase@sha256:82460488879b929eb6c08a53352647503ea80634227500a8971cef0d30b898cb`.
 Workshop і SteamCMD bootstrap mutable; для відкату потрібен локальний backup.
 
-Підготовка тепер розділена на mount-and-blade2-coop.sh для Linux та
-mount-and-blade2-coop.ps1 для Windows. Обидва завершуються до запуску гри.
-Startup запускає native bundled dotnet.exe на Windows або стандартні
-env/xvfb-run/socat/Wine executable на Linux; власних scripts у startup немає.
+Підготовку виконує mount-and-blade2-coop.sh, який завершується до запуску гри.
+Startup запускає стандартні env/xvfb-run/socat/Wine executable у Linux Docker;
+власних scripts у startup немає. Нативну Windows-гілку видалено в ConfigVersion 12.
 Python та base64 відсутні. FetchURL бере helpers із main. Це mutable URL:
 для відтворення вкажіть перевірений commit у UpdateSourceData або відновіть
 відповідну версію runtime з backup. jq читає пароль із JSON-файлу, не з argv.
 
 Користувач надав встановлений SubModule.xml: Id=Coop, Version=v0.1.7,
 CoopNightly зазначено як несумісний модуль. Тому App.AppSettings.CoopModuleId=Coop.
-Pre-start на обох ОС перевіряє відповідність ID, а не змінює XML мода.
+Pre-start перевіряє відповідність ID, а не змінює XML мода.
 
 Це приватний експериментальний шаблон. Схожість із
 AMPTemplates не є підтвердженням приймання CubeCoders чи runtime-сумісності AMP 2.8.
 Нові тести перевіряють auth/cache на штучних даних, пароль, порядок Update,
 staging лише в керованому server/, збереження сейвів, відмову при неправильному
 module ID і відсутність запуску гри з Pre-start. Реальна Steam Guard сесія,
-Workshop download і приймання кампанії на обох ОС ще не перевірені.
+Workshop download і приймання кампанії у Linux/Docker ще потребують перевірки.
 
-Пройшли 18 Linux shell-перевірок і 24 перевірки у Windows PowerShell 5.1.
-Нативний Windows console fixture підтвердив абсолютний data path і stop через
-redirected stdin. Wine smoke підтвердив створення prefix, data path і stop через
-той самий env/xvfb-run/socat ланцюжок. Це перевірка механізму, не запуск гри.
+Wine smoke перевіряє створення prefix, data path і stop через той самий
+env/xvfb-run/socat ланцюжок. Це перевірка механізму, не запуск гри.
 
-22.11.2026: на реальному Windows-інстансі штатний Steam login AMP не створив
-Accounts/ConnectCache після вводу логіна/пароля. Копія його SteamCMD, без кешу
-користувача, успішно виконала +quit і +login anonymous +quit у workspace.
-Точну причину некоректного виводу AMP не встановлено. Додано ручний login action
-без зчитування/зберігання пароля й без автоматичного виклику в Update stages;
-це обхід для діагностики, а не заявлене виправлення нативного AMP login.
+22.11.2026: за рішенням користувача підтримку нативного Windows AMP припинено.
+Видалено PowerShell helper, Windows Update/Pre-start stages і відповідні тести.
+Windows-бінарні файли Workshop та ForceDownloadPlatform=Windows залишено:
+їх використовує Wine всередині Linux-контейнера. Шаблон не заявляє відповідність
+кросплатформній вимозі офіційного AMPTemplates.

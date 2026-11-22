@@ -19,14 +19,20 @@ jq -e 'all(.[]; .FieldName != "steam_username") and
   any(.[]; .FieldName == "SteamAdvertise" and .ParamFieldName == "$.steam" and .InputType == "checkbox" and .DefaultValue == "false") and
   any(.[]; .FieldName == "AcceptEULA" and .DefaultValue == "false" and .EnumValues.True == "true" and .IncludeInCommandLine == false)' \
   "$REPO/mount-and-blade2-coopconfig.json" >/dev/null
-jq -e 'any(.[]; .UpdateSourcePlatform == "Windows" and .UpdateSourceData == "powershell.exe") and
+jq -e 'length == 4 and all(.[]; .UpdateSourcePlatform == "Linux") and
   any(.[]; .UpdateSourcePlatform == "Linux" and .UpdateSourceData == "/bin/bash") and
-  any(.[]; .UpdateSourcePlatform == "All" and .UpdateSource == "SteamCMD" and .UpdateSourceData == "228980")' \
+  any(.[]; .UpdateSource == "SteamCMD" and .UpdateSourceData == "228980" and .ForceDownloadPlatform == "Windows")' \
   "$REPO/mount-and-blade2-coopupdates.json" >/dev/null
 jq -e '.[0].ConfigFile == "data/server-config.json" and .[0].AutoMap == true' \
   "$REPO/mount-and-blade2-coopmetaconfig.json" >/dev/null
 if grep -E 'python|base64' "$REPO/mount-and-blade2-coop.kvp" "$REPO/mount-and-blade2-coopupdates.json"; then exit 1; fi
-grep -Fx 'App.ExecutableWin=server\engine\dotnet\dotnet.exe' "$REPO/mount-and-blade2-coop.kvp" >/dev/null
+grep -Fx 'Meta.OS=Linux' "$REPO/mount-and-blade2-coop.kvp" >/dev/null
+grep -Fx 'Meta.DockerRequired=False' "$REPO/mount-and-blade2-coop.kvp" >/dev/null
+grep -Fx 'Meta.ContainerPolicy=RecommendedOnLinux' "$REPO/mount-and-blade2-coop.kvp" >/dev/null
+if grep -E '^App\.(ExecutableWin|WindowsCommandLineArgs)=' "$REPO/mount-and-blade2-coop.kvp"; then exit 1; fi
+jq -e 'length == 1 and all(.[]; .UpdateSourcePlatform == "Linux" and .UpdateSourceData == "/bin/bash")' \
+  "$REPO/mount-and-blade2-coopstart.json" >/dev/null
+[[ ! -e "$REPO/mount-and-blade2-coop.ps1" && ! -e "$REPO/tests/test_windows.ps1" ]]
 grep -Fx 'App.ExecutableLinux=/usr/bin/env' "$REPO/mount-and-blade2-coop.kvp" >/dev/null
 if grep '^App.CommandLineArgs=' "$REPO/mount-and-blade2-coop.kvp" | grep -Eq '\.(sh|ps1|bat)'; then exit 1; fi
 sed -n 's/^App.EnvironmentVariables=//p' "$REPO/mount-and-blade2-coop.kvp" | jq -e '.DS_ACCEPT_EULA == "{{AcceptEULA}}"' >/dev/null

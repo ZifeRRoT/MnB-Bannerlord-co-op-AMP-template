@@ -6,13 +6,5 @@
     "UpdateSourceData": "/bin/bash",
     "UpdateSourceArgs": "\"{{$FullRootDir}}mount-and-blade2-coop.sh\" prepare {{$GamePort}} {{$EnginePort}} {{CoopModuleId}}",
     "SkipOnFailure": false
-  },
-  {
-    "UpdateStageName": "Prepare campaign and validate Windows engine",
-    "UpdateSourcePlatform": "Windows",
-    "UpdateSource": "Executable",
-    "UpdateSourceData": "powershell.exe",
-    "UpdateSourceArgs": "-NoProfile -ExecutionPolicy Bypass -File \"{{$FullRootDir}}mount-and-blade2-coop.ps1\" -Action prepare -GamePort {{$GamePort}} -EnginePort {{$EnginePort}} -ModuleId {{CoopModuleId}}",
-    "SkipOnFailure": false
   }
 ]
