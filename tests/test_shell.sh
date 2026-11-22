@@ -15,11 +15,13 @@ for path in "$REPO"/*.json; do jq -e . "$path" >/dev/null; done
 [[ $(jq -r .prefix "$REPO/manifest.json") == '' ]]
 grep -Fx 'Meta.DisplayName=Mount & Blade II: Bannerlord Co-op' "$REPO/mount-and-blade2-coop.kvp" >/dev/null
 jq -e 'all(.[]; .FieldName != "steam_username") and
+  all(.[]; has("Description") and (.Description | length > 0) and has("EnumValues")) and
   any(.[]; .FieldName == "ServerPassword" and .InputType == "Password" and .IncludeInCommandLine == false) and
   any(.[]; .FieldName == "SteamAdvertise" and .ParamFieldName == "$.steam" and .InputType == "checkbox" and .DefaultValue == "false") and
   any(.[]; .FieldName == "AcceptEULA" and .DefaultValue == "false" and .EnumValues.True == "true" and .IncludeInCommandLine == false)' \
   "$REPO/mount-and-blade2-coopconfig.json" >/dev/null
 jq -e 'length == 4 and all(.[]; .UpdateSourcePlatform == "Linux") and
+  .[0].UpdateSourceData == "https://cdn-repo.c7rs.com/AMPTemplates/mount-and-blade2-coop.sh" and
   any(.[]; .UpdateSourcePlatform == "Linux" and .UpdateSourceData == "/bin/bash") and
   any(.[]; .UpdateSource == "SteamCMD" and .UpdateSourceData == "228980" and .ForceDownloadPlatform == "Windows")' \
   "$REPO/mount-and-blade2-coopupdates.json" >/dev/null
@@ -36,7 +38,29 @@ jq -e 'length == 1 and all(.[]; .UpdateSourcePlatform == "Linux" and .UpdateSour
 grep -Fx 'App.ExecutableLinux=/usr/bin/env' "$REPO/mount-and-blade2-coop.kvp" >/dev/null
 if grep '^App.CommandLineArgs=' "$REPO/mount-and-blade2-coop.kvp" | grep -Eq '\.(sh|ps1|bat)'; then exit 1; fi
 sed -n 's/^App.EnvironmentVariables=//p' "$REPO/mount-and-blade2-coop.kvp" | jq -e '.DS_ACCEPT_EULA == "{{AcceptEULA}}"' >/dev/null
+sed -n 's/^App.EnvironmentVariables=//p' "$REPO/mount-and-blade2-coop.kvp" | jq -e \
+  'has("BANNERLORD_USER_DIR") == false and has("COOP_DATA_DIR") == false and has("DOTNET_ROOT") == false' >/dev/null
+jq -e 'length == 1 and .[0].Ref == "GamePort" and .[0].Port == 4200 and .[0].Protocol == "UDP" and (.[0] | has("ChildPorts") == false)' \
+  "$REPO/mount-and-blade2-coopports.json" >/dev/null
+grep -Fx 'Meta.ConfigVersion=1' "$REPO/mount-and-blade2-coop.kvp" >/dev/null
+grep -E '^Meta.ReleaseNotes=.' "$REPO/mount-and-blade2-coop.kvp" >/dev/null
+sed -n 's/^App.AppSettings=//p' "$REPO/mount-and-blade2-coop.kvp" | jq -e '.CoopModuleId == "Coop" and (has("CoopEnginePort") == false)' >/dev/null
+jq -e '.[0].UpdateSourceArgs | endswith(" prepare {{$GamePort}} {{CoopModuleId}}")' "$REPO/mount-and-blade2-coopstart.json" >/dev/null
+if grep -E 'EnginePort|/dedicatedcustomserver' "$REPO/mount-and-blade2-coop.kvp" "$REPO/mount-and-blade2-coopstart.json"; then exit 1; fi
 pass 'AMP manifests: masked password, no username/Python/base64, requested display name'
+
+monitor=$(sed -n 's/^App.MonitorChildProcessName=//p' "$REPO/mount-and-blade2-coop.kvp" | sed 's/{{CoopModuleId}}/Coop/g')
+modules='_MODULES_*Native*SandBoxCore*Sandbox*Coop*DedicatedServer.Windows*_MODULES_'
+for executable in '../../dotnet/dotnet.exe' 'dotnet.exe' '"Z:\AMP\server\engine\dotnet\dotnet.exe"'; do
+  printf '%s TaleWorlds.Starter.DotNetCore.dll "%s"\n' "$executable" "$modules" | grep -Pq "$monitor"
+done
+for command in "socat STDIO EXEC:dotnet.exe TaleWorlds.Starter.DotNetCore.dll $modules" \
+  "dotnet.exe Other.dll $modules" \
+  "dotnet.exe TaleWorlds.Starter.DotNetCore.dll ${modules/Coop/CoopNightly}" \
+  "dotnet.exe TaleWorlds.Starter.DotNetCore.dll $modules /dedicatedcustomserver 7210 EU 0"; do
+  if printf '%s\n' "$command" | grep -Pq "$monitor"; then exit 1; fi
+done
+pass 'process monitor matches the simplified Co-op command and rejects wrappers and other modules'
 
 cp "$REPO/mount-and-blade2-coop.sh" "$ROOT/mount-and-blade2-coop.sh"
 bash "$ROOT/mount-and-blade2-coop.sh" init
@@ -69,9 +93,11 @@ prepare_config 4400
 jq -e '.saveName=="dadada" and .password=="legacy" and .futureOption==42' "$ROOT/data/server-config.json" >/dev/null
 pass 'stale legacy settings.json cannot overwrite values AMP wrote to server config'
 
-for invalid in 0 04200 65535 -1 '4200;echo bad'; do reject prepare_config "$invalid"; done
-reject prepare 4200 4201 Coop
-pass 'invalid/overlapping allocations rejected'
+for invalid in 0 04200 65536 -1 '4200;echo bad'; do reject prepare_config "$invalid"; done
+prepare_config 65535
+jq -e '.port == 65535' "$ROOT/data/server-config.json" >/dev/null
+reject prepare 0 Coop
+pass 'invalid allocations rejected; highest UDP port accepted without a reserved child port'
 
 printf '{"saveName":"../../escape"}\n' > "$ROOT/data/server-config.json"
 reject prepare_config 4200
@@ -164,14 +190,14 @@ for binary in wine wineboot wineserver socat xvfb-run; do
     chmod +x "$WORK/bin/$binary"
 done
 export COOP_CAPTURE="$WORK/launch-args"
-(export PATH="$WORK/bin:$PATH"; prepare 4500 7210 Coop)
+(export PATH="$WORK/bin:$PATH"; prepare 4500 Coop)
 [[ ! -f "$COOP_CAPTURE" ]]
 grep -q 'existing progress' "$ROOT/data/Game Saves/safe.sav"
 jq -e '.password=="DO_NOT_LEAK_SERVER_PASSWORD" and .port==4500' "$ROOT/data/server-config.json" >/dev/null
 pass 'Pre-start preserves config/save and returns without launching the game'
-reject prepare 4500 7210 CoopNightly
+reject prepare 4500 CoopNightly
 mv "$ROOT/server/.amp-coop-ready" "$WORK/ready-marker"
-reject prepare 4500 7210 Coop
+reject prepare 4500 Coop
 mv "$WORK/ready-marker" "$ROOT/server/.amp-coop-ready"
 pass 'incompatible module ID or incomplete staging fails before engine launch'
 

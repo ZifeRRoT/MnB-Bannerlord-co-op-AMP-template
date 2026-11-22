@@ -7,8 +7,10 @@ Update and Pre-start, then exits; the startup command does not invoke the helper
 No Python or base64 is used. Native Windows AMP is not supported.
 
 Local shell tests and a Wine smoke test check preparation and console handling
-with a test executable. A full Linux/Docker run reaching Ready, accepting players,
-and stopping with campaign progress saved still needs verification. This is a
+with a test executable. The PR bot also reported a real Linux run that installed
+the Workshop build, reached Ready, listened on UDP 4200, applied settings after
+restart, and saved the world on a clean stop in about eight seconds. Client
+connections and long-term campaign persistence still need verification. This is a
 standalone Linux template, not a cross-platform AMPTemplates submission candidate.
 
 ## Installation
@@ -40,7 +42,7 @@ For local testing, locate your ADS DeploymentTemplates directory using
 As the ADS owner, copy manifest.json and the mount-and-blade2-coop* files into a
 new LOCAL-BannerlordCoop-main subdirectory, add the repository
 LOCAL/BannerlordCoop:main, and fetch it. The helper is still downloaded from the
-published main branch.
+AMPTemplates repository CDN. The helper must be available there before Update can fetch it.
 
 ## Settings
 
@@ -57,7 +59,7 @@ players joining the server. Enter Steam credentials in AMP's Steam login dialog.
 There is no Steam username setting: the account is selected from AMP's cache.
 If several accounts are cached, the helper checks their tokens without a password
 and uses the first reusable account. Legacy settings.json is no longer used.
-The engine region is fixed to EU.
+No engine port, region, or permission arguments are passed at startup.
 
 AMP AutoMap writes settings directly to data/server-config.json, which the server
 reads. Apply changes with Stop → Start. The shell helper does not copy old
@@ -82,8 +84,9 @@ that file or send `yes` to stdin. Terms may change after updates: review them
 before Start if the option remains enabled.
 
 Clearing the checkbox disables automatic acceptance but does not delete an
-existing server-written eula.txt. The installed build's actual EULA flow still
-needs verification; local tests check the disabled default and environment mapping.
+existing server-written eula.txt. The PR bot confirmed that, without prior acceptance, the disabled default leaves
+Start in Configuring at `Accept the EULA? [y/N]`. Read the terms, then enable the
+option or answer the prompt in AMP Console. Local tests check the default and mapping.
 
 ## Steam Guard and Update
 
@@ -92,7 +95,7 @@ complete Steam login, password, and Guard in AMP's standard dialog.
 
 Update runs four stages:
 
-1. FetchURL downloads the shell helper from this repository.
+1. FetchURL downloads the shell helper from the AMPTemplates repository CDN.
 2. Helper init creates data/server-config.json if missing. AutoMap needs this
    file before the game starts. Init preserves an existing file.
 3. The standard SteamCMD stage for app 228980 (Common Redistributables) handles
@@ -121,9 +124,9 @@ If progress stalls, check Steam's content_log.txt. If no reusable cache exists,
 retry Update and complete Guard in AMP's dialog.
 
 Update checks for download success confirmation and the bundled engine/.NET
-files. Start does not update the game automatically. Main and Workshop content
-are mutable: use a verified revision and keep backups. Publish the shell helper
-alongside the template so FetchURL can retrieve it. Template generation is no
+files. Start does not update the game automatically. CDN and Workshop content
+are mutable: use a verified revision and keep backups. The shell helper must be published
+on the AMPTemplates repository CDN so FetchURL can retrieve it. Template generation is no
 longer required.
 
 ## Upgrading an existing template
@@ -136,7 +139,7 @@ longer required.
 5. Run Update, then Stop → Start. Check saveName and autosaveMinutes in
    data/server-config.json after Start. Do not publish the password.
 
-ConfigVersion 7 and later fix settings application by mapping metaconfig to
+The current template maps metaconfig to
 data/server-config.json. Update alone does not change this mapping: Refresh
 Configuration first. If the instance's active metaconfig.json still contains
 ConfigFile=settings.json, it uses the old mapping.
@@ -148,7 +151,10 @@ in a real AMP deployment. You can change an existing instance's friendly name
 separately.
 
 The data directory remains **bannerlord-coop/**: saves, the Wine prefix, and the
-cache are not moved. ConfigVersion 12 supports Linux only and recommends Docker.
+cache are not moved. The new AMPTemplates submission starts at ConfigVersion 1,
+independently of earlier private-template versions. Linux remains the only runtime
+platform and Docker is recommended. Refresh existing private instances manually;
+the reset version is not an automatic upgrade signal.
 Refresh Configuration on an existing Linux instance. A native Windows instance
 cannot become a Linux instance through this change: create a separate Linux/Docker
 instance and import the campaign while the game is stopped.
@@ -165,20 +171,23 @@ silently rename CoopNightly to Coop or modify the mod's files.
 
 | Allocation | Purpose |
 | --- | --- |
-| UDP 4200 | Co-op player connection port |
-| UDP 4201 | Child port with Offset=1 for the dedicated build |
-| UDP 7210 | Engine custom-server port, not the player connection port |
+| UDP 4200 | Co-op player connection port; the only published allocation |
 
-AMP passes the allocated GamePort and EnginePort to the shell helper. A second
-instance needs its own ports. Official mod instructions describe one public UDP
-port; the third-party dedicated launcher uses a pair. Whether the second and
-engine ports need public access still needs verification. No TCP allocation is
-added.
+AMP passes the allocated GamePort to the shell helper. A second instance needs
+its own player port. The PR bot observed only UDP 4200 listening, so the previous
+4201 and 7210 external allocations have been removed. No TCP allocation is added.
+
+The entire `/dedicatedcustomserver 7210 EU 0` block has been removed. Direct tests
+of the installed Coop v0.1.7 / Bannerlord v1.4.8 build reached Ready, listened on
+UDP 4200, saved the world, and exited cleanly without this block. Removing only
+some of its positional values failed with engine exit code 82. No internal
+engine port setting or corresponding Pre-start validation remains. The player
+port is read from data/server-config.json.
 
 Ready marker: `coop server up, waiting for clients`. Expected commands include
 help, status, players, save, and stop; check help/@DS@ in the installed build.
-AMP Stop sends stop and is configured to wait 180 seconds. Actual campaign
-saving on shutdown still needs verification. Force Stop does not guarantee a save.
+AMP Stop sends stop and is configured to wait 180 seconds. The PR bot observed a world save
+and clean exit in about eight seconds on Linux. Force Stop does not guarantee a save.
 
 SteamCMD output is passed through without ANSI filtering. AMP's console may
 show color/cursor escape codes as characters; these alone do not indicate a
@@ -188,6 +197,12 @@ Pre-start validates configuration, ports, and module ID, creates a missing save,
 initializes the Wine prefix, then returns control to AMP.
 Linux startup uses the standard chain
 `env → xvfb-run → socat EXEC → Wine → bundled dotnet.exe`.
+The command executed under Wine, from WorkingDir, is:
+
+```text
+../../dotnet/dotnet.exe TaleWorlds.Starter.DotNetCore.dll "_MODULES_*Native*SandBoxCore*Sandbox*Coop*DedicatedServer.Windows*_MODULES_"
+```
+
 socat provides a PTY with echo=0 and inlcr; EXEC does not use a shell for the
 engine. Startup does not call our .sh helper. The password is absent from the
 command line.
@@ -196,7 +211,7 @@ The physical WorkingDir is `server/engine/bin/Win64_Shipping_Server`.
 The standard env executable sets BANNERLORD_USER_DIR, COOP_DATA_DIR, and DOTNET_ROOT
 to absolute Wine paths Z:/… before launching Xvfb. This does not depend on cwd
 changes inside the game. Windows engine binaries remain necessary for Wine.
-MonitorChildProcessName matches dotnet/Starter and the instance's EnginePort.
+MonitorChildProcessName matches dotnet, the Starter DLL, and the Co-op module token.
 Additional Workshop mods are not supported yet.
 
 ## Data and backups
@@ -270,16 +285,27 @@ preservation, and ensuring Pre-start returns without launching the game. The
 Wine smoke test runs Windows cmd through the same xvfb-run/socat chain and checks
 the data path and stop input. It does not launch the game.
 
+The PR bot reported successful Workshop installation (about 6.5 GB), Ready,
+UDP 4200 listening, a world save on clean Stop, and password/save name/autosave/
+Steam flag changes in data/server-config.json after restart. Its test replaced
+the helper URL with the repository CDN URL; this revision includes that change.
+The report covers the tested build before allocation cleanup. Subsequent local
+tests ran the actual installed build without the engine argument block in a
+Linux Docker volume on Windows: Ready, UDP 4200, shutdown save, and exit code 0
+all passed with Steam advertising disabled. These direct engine tests do not
+replace an AMP deployment and monitoring test of this final template revision.
+
 The following still need verification in Linux/Docker:
 
-- The template is listed and Update succeeds with real Steam Guard and Workshop.
-- Start reaches the real Ready state and a client can connect.
-- Incorrect passwords are rejected; the game reads AMP changes after Start.
-- Console accepts help/status/save; Stop saves and reaches Stopped.
+- Update works once the helper is published on the repository CDN.
+- A real client can connect and incorrect passwords are rejected.
+- The game uses the configured values; Steam advertising actually works.
+- Console accepts help/status/save; AMP monitoring and lifecycle checks pass
+  with the final simplified template.
 - Restart restores progress and characters; recreating the container with the
   same bind mount preserves data.
-- CPU/RAM and process monitoring belong to the correct instance; a second
-  instance has no port or file conflicts.
+- CPU/RAM and monitoring belong to the correct instance; a second instance has
+  no port or file conflicts.
 
 Until these checks are complete, treat this template as a draft. Matching the
-structure and passing local tests do not imply acceptance by CubeCoders.
+structure and passing tests do not imply acceptance by CubeCoders.

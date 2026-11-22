@@ -13,9 +13,9 @@
 - Steam advertising: the server-config steam field appears in the third-party dedicated launcher. [Server-manager configuration](https://github.com/PlodyIce/bannerlordcoop-server-manager/blob/main/docs/CONFIGURATION.md) describes STEAM_ADVERTISE as runtime server advertising. At the inspected revision, the official source/Coop.Core/Server/ServerModule.cs registers a Steam advertiser only when SessionDiscovery.SteamAvailable is true; otherwise it uses NoopSessionAdvertiser. A SteamCMD cache does not prove that runtime Steam API is available. The UI switch sets steam=true/false; actual Steam visibility has not been verified.
 
 The official repository's public code does not contain the current implementation
-of BannerlordCoopServer.exe / the @DS@ CLI. Commands, the ready marker, and the
-port pair come from the third-party launcher and have not been confirmed by
-running the Workshop binary on Linux. Check exact engine, .NET, and game versions
+of BannerlordCoopServer.exe / the @DS@ CLI. Commands and the original port pair came from the third-party launcher.
+The PR bot has since confirmed the ready marker and graceful stop on Linux,
+with only UDP 4200 listening; unused external port allocations were removed. Check exact engine, .NET, and game versions
 in release-info.txt after downloading with an entitled account.
 
 The registry returned this linux/amd64 manifest:
@@ -35,11 +35,11 @@ for rollback.
 Preparation uses mount-and-blade2-coop.sh, which exits before the game starts.
 Startup uses the standard env/xvfb-run/socat/Wine executables in Linux Docker;
 no custom scripts are called during startup. Native Windows support was removed
-in ConfigVersion 12. Docker is recommended; running directly on a Linux host
+during private-template development; the new upstream submission starts at ConfigVersion 1. Docker is recommended; running directly on a Linux host
 without a container has not been tested.
-No Python or base64 is used. FetchURL retrieves the helper from main. This URL is
-mutable: set a verified commit in UpdateSourceData for reproducibility, or restore
-the matching helper version from backup. jq reads the password from JSON, not argv.
+No Python or base64 is used. FetchURL retrieves the helper from the AMPTemplates repository CDN as required
+by review. CDN content is mutable; restore the matching helper from backup
+when reproducing an older deployment. jq reads the password from JSON, not argv.
 
 The user supplied an installed SubModule.xml with Id=Coop, Version=v0.1.7, and
 CoopNightly listed as incompatible. Therefore App.AppSettings.CoopModuleId=Coop.
@@ -49,8 +49,9 @@ This is a private experimental template. Similarity to AMPTemplates does not
 establish CubeCoders acceptance or runtime compatibility with AMP 2.8.
 Tests cover synthetic auth/cache data, passwords, Update ordering, staging only
 inside a managed server/ directory, save preservation, rejection of an incorrect
-module ID, and ensuring Pre-start does not launch the game. Real Steam Guard,
-Workshop download, and campaign operation still need verification in Linux/Docker.
+module ID, and ensuring Pre-start does not launch the game. The user-provided PR bot report confirms real Linux Workshop installation, Ready,
+UDP 4200, restart-time configuration mapping, and a world save on clean stop.
+Client connections, password enforcement, and long-term persistence remain unverified.
 
 The Wine smoke test checks prefix creation, the data path, and stop through the
 same env/xvfb-run/socat chain. It checks the mechanism without launching the game.
@@ -60,3 +61,41 @@ The PowerShell helper, Windows Update/Pre-start stages, and corresponding tests
 were removed. Windows Workshop binaries and ForceDownloadPlatform=Windows remain
 because Wine uses them inside the Linux container. This template does not claim
 to meet the official AMPTemplates cross-platform requirement.
+
+## PR review follow-up
+
+The user supplied an amp-template-bot report: after switching the helper to
+`https://cdn-repo.c7rs.com/AMPTemplates/mount-and-blade2-coop.sh`, a Linux test
+installed about 6.5 GB, reached `coop server up`, listened on UDP 4200, and saved
+the world before exiting cleanly in about eight seconds. Password, save name,
+autosave, and Steam flag changes appeared in data/server-config.json after restart.
+Windows was skipped because Meta.OS is Linux. Without previous EULA acceptance,
+the default-disabled acceptance option leaves Start waiting at the console prompt.
+
+This revision applies the CDN URL, repository field order, initial ConfigVersion 1,
+release notes, EULA description, and environment cleanup. Only GamePort remains
+externally allocated. An internal CoopEnginePort setting was initially retained,
+then removed after the direct engine tests below. The final template still needs
+an AMP bot rerun.
+
+## Direct engine argument tests
+
+The installed Workshop build (2026-10-30, Bannerlord v1.4.8, Coop v0.1.7) was
+tested under Wine 11.0 in a Linux Docker volume on Windows with independent
+test campaigns and Steam advertising disabled. The user explicitly authorized
+EULA acceptance for these tests. All ten cases retained the same Starter DLL
+and module token.
+
+The full `/dedicatedcustomserver 7210 EU 0` block, `/dedicatedcustomserver 0 EU 0`,
+and omission of the entire block each reached Ready, listened on UDP 4200,
+saved the campaign, and exited with code 0 after stop. All seven partially
+specified forms failed with engine exit code 82. Inspection of the installed
+engine parser confirmed positional ServerPort, ServerRegion, and Permission
+values after the flag; omission of the whole flag avoids that parsing branch.
+
+The template therefore omits the whole block and removes its internal port
+setting, Pre-start argument, and port-overlap checks. Monitoring now matches
+the Starter DLL and Co-op module token. Client connections, Steam advertising,
+and AMP process monitoring after this change remain unverified. The actual
+game tests required a Linux filesystem in this environment; control launches
+directly from Windows bind mounts failed before normal startup.
