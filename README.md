@@ -1,17 +1,17 @@
-# Mount & Blade II: Bannerlord Co-op для AMP
+# Mount & Blade II: Bannerlord Co-op for AMP
 
-Експериментальний Generic template для Linux amd64. Docker рекомендований.
-У Docker використовується один контейнер `cubecoders/ampbase:wine-stable`, Xvfb, socat PTY
-та Wine. Власний Dockerfile не потрібен. Bash працює лише в Update та Pre-start,
-після чого завершується; startup-команда не викликає наші скрипти.
-Python та base64 відсутні. Нативний Windows AMP не підтримується.
+An experimental Generic template for Linux amd64. Docker is recommended.
+The Docker setup uses one `cubecoders/ampbase:wine-stable` container with Xvfb,
+socat PTY, and Wine. No custom Dockerfile is needed. Bash runs only during
+Update and Pre-start, then exits; the startup command does not invoke the helper.
+No Python or base64 is used. Native Windows AMP is not supported.
 
-Локальні shell-тести та Wine smoke перевіряють підготовку й консоль на тестовому
-executable. Реальний Linux/Docker запуск із Ready, підключенням гравців і Stop
-зі збереженням кампанії ще потребує перевірки. Це окремий Linux-шаблон, а не
-кандидат на кросплатформне подання до AMPTemplates.
+Local shell tests and a Wine smoke test check preparation and console handling
+with a test executable. A full Linux/Docker run reaching Ready, accepting players,
+and stopping with campaign progress saved still needs verification. This is a
+standalone Linux template, not a cross-platform AMPTemplates submission candidate.
 
-## Підключення
+## Installation
 
 ADS → Configuration → Instance Deployment → Configuration Repositories → **+**:
 
@@ -19,192 +19,205 @@ ADS → Configuration → Instance Deployment → Configuration Repositories →
 ZifeRRoT/MnB-Bannerlord-co-op-AMP-template:main
 ```
 
-Натисніть Fetch Latest, оновіть браузер і знайдіть у Create Instance
-**Mount & Blade II: Bannerlord Co-op**. Префікс Community прибрано.
-Docker рекомендований. У Wine-образі перевірено Bash, jq, Wine,
-wineboot, wineserver, Xvfb, xauth, socat і timeout.
-Для запуску без Docker ці залежності потрібно встановити на Linux-хості;
-Wine очікується за шляхом `/usr/bin/wine`, Xvfb wrapper — `/usr/bin/xvfb-run`,
-socat — `/usr/bin/socat`. Нативний запуск без контейнера ще не перевірено.
-Окремий .NET runtime завантажувати не потрібно: engine містить власний.
+Click Fetch Latest, refresh the browser, and find
+**Mount & Blade II: Bannerlord Co-op** under Create Instance.
+The Community prefix has been removed.
 
-Файли: `manifest.json`, `mount-and-blade2-coop.kvp`,
+Docker is recommended. Bash, jq, Wine, wineboot, wineserver, Xvfb, xauth, socat,
+and timeout have been checked in the Wine image. Without Docker, install these
+dependencies on the Linux host. The template expects Wine at `/usr/bin/wine`,
+the Xvfb wrapper at `/usr/bin/xvfb-run`, and socat at `/usr/bin/socat`.
+Running directly on a Linux host without a container has not been tested.
+The engine includes its own .NET runtime; no separate runtime download is needed.
+
+Template files: `manifest.json`, `mount-and-blade2-coop.kvp`,
 `mount-and-blade2-coopconfig.json`, `mount-and-blade2-coopmetaconfig.json`,
 `mount-and-blade2-coopports.json`, `mount-and-blade2-coopupdates.json`,
-`mount-and-blade2-coopstart.json`, `mount-and-blade2-coop.sh`.
+`mount-and-blade2-coopstart.json`, and `mount-and-blade2-coop.sh`.
 
-Для локальної перевірки знайдіть справжній DeploymentTemplates вашого ADS через
-`ampinstmgr list` та `find /home/amp /opt -type d -name DeploymentTemplates`.
-Як власник ADS скопіюйте manifest.json та файли mount-and-blade2-coop* у новий
-підкаталог LOCAL-BannerlordCoop-main, додайте repository LOCAL/BannerlordCoop:main,
-виконайте Fetch. Runtime все одно завантажується з опублікованої main.
+For local testing, locate your ADS DeploymentTemplates directory using
+`ampinstmgr list` and `find /home/amp /opt -type d -name DeploymentTemplates`.
+As the ADS owner, copy manifest.json and the mount-and-blade2-coop* files into a
+new LOCAL-BannerlordCoop-main subdirectory, add the repository
+LOCAL/BannerlordCoop:main, and fetch it. The helper is still downloaded from the
+published main branch.
 
-## Налаштування
+## Settings
 
-| Поле AMP | Дія |
+| AMP field | Effect |
 | --- | --- |
-| Server password | Приховане поле пароля гравців; порожнє значення вимикає пароль |
-| Campaign save | Ім'я сейву без розширення: ASCII-літери, цифри, `_`, `-` |
-| Autosave minutes | Автозбереження, 1–1440 хвилин |
-| Register server in Steam | Вмикає поле steam; початково вимкнено, застосовується після Stop → Start |
-| Accept server EULA | Явне прийняття умов серверу через DS_ACCEPT_EULA; початково вимкнено |
+| Server password | Masked player password; leave empty to disable password protection |
+| Campaign save | Save name without an extension: ASCII letters, digits, `_`, `-` |
+| Autosave minutes | Autosave interval, 1–1440 minutes |
+| Register server in Steam | Sets the steam field; disabled by default, applied after Stop → Start |
+| Accept server EULA | Explicit acceptance through DS_ACCEPT_EULA; disabled by default |
 
-Зміни застосовуються на наступному **Start**. Server password — не Steam-пароль.
-Поле Steam username видалено. Акаунт визначається з кешу AMP; якщо старих акаунтів
-кілька, скрипт перевіряє токени без пароля й використовує перший придатний.
-Старий settings.json більше не використовується. Регіон engine зафіксовано як EU.
+Changes take effect on the next **Start**. Server password is the password for
+players joining the server. Enter Steam credentials in AMP's Steam login dialog.
+There is no Steam username setting: the account is selected from AMP's cache.
+If several accounts are cached, the helper checks their tokens without a password
+and uses the first reusable account. Legacy settings.json is no longer used.
+The engine region is fixed to EU.
 
-AMP через AutoMap записує налаштування прямо у data/server-config.json, який
-читає сервер. Застосування до гри потребує Stop → Start. Shell не переносить
-старі defaults із settings.json. Значення пароля не передається через argv чи
-environment і не друкується runtime. Лапки, слеші та Unicode екрануються jq.
-Приховане поле UI не шифрує файли на диску: резервні копії зберігайте приватно.
+AMP AutoMap writes settings directly to data/server-config.json, which the server
+reads. Apply changes with Stop → Start. The shell helper does not copy old
+defaults from settings.json. The password is never passed through argv or the
+environment and is not printed by the helper. jq escapes quotes, backslashes,
+and Unicode. A masked UI field does not encrypt files on disk; keep backups private.
 
-Register server in Steam вмикає Steam advertising лише коли Steam API доступний
-самому запущеному engine. Кеш SteamCMD використовується для завантажень і сам
-не створює runtime Steam-сеанс. У Docker з одним SteamCMD видимість у Steam
-не гарантована; реальну реєстрацію ще треба перевірити. Для вимкнення зніміть
-позначку й перезапустіть гру. Pre-start зберігає вибране true/false.
+Register server in Steam enables Steam advertising only when Steam API is
+available to the running engine. The SteamCMD cache is used for downloads and
+does not create a runtime Steam session. Steam visibility is not guaranteed in a
+container with only SteamCMD; actual registration still needs verification.
+To disable advertising, clear the checkbox and restart the game. Pre-start
+preserves the selected true/false value.
 
-### EULA без вводу в консоль
+### Accepting the EULA without console input
 
-Після Update прочитайте `server/EULA.md` (або EULA.txt) та `server/LICENSE.txt`
-у File Manager. Якщо погоджуєтеся, увімкніть **Accept server EULA** й виконайте
-Stop → Start. AMP передасть підтримувану сервером змінну `DS_ACCEPT_EULA=true`
-у Linux/Wine. Прийняття сервер записує сам у `data/eula.txt`; template
-цей файл не підробляє й не надсилає `yes` у stdin. Умови після оновлень можуть
-змінюватися: переглядайте їх перед Start, якщо опція залишена увімкненою.
+After Update, read `server/EULA.md` (or EULA.txt) and `server/LICENSE.txt` in
+File Manager. If you agree, enable **Accept server EULA** and perform Stop → Start.
+AMP passes the server-supported `DS_ACCEPT_EULA=true` variable to Linux/Wine.
+The server records acceptance in `data/eula.txt`; the template does not fabricate
+that file or send `yes` to stdin. Terms may change after updates: review them
+before Start if the option remains enabled.
 
-Зняття позначки вимикає автоматичне прийняття, але не видаляє раніше записаний
-сервером eula.txt. Реальний EULA-прохід установленого build ще треба перевірити;
-локальні тести перевіряють вимкнений default і передачу environment-параметра.
+Clearing the checkbox disables automatic acceptance but does not delete an
+existing server-written eula.txt. The installed build's actual EULA flow still
+needs verification; local tests check the disabled default and environment mapping.
 
-## Steam Guard та Update
+## Steam Guard and Update
 
-Потрібен Steam-акаунт із Bannerlord (`261550`). Натисніть Update і пройдіть
-Steam login/пароль/Guard у штатному діалозі AMP, а не в Console.
+A Steam account that owns Bannerlord (`261550`) is required. Click Update and
+complete Steam login, password, and Guard in AMP's standard dialog.
 
-Update виконує чотири етапи:
+Update runs four stages:
 
-1. FetchURL завантажує shell helper із цього репозиторію.
-2. Helper init створює data/server-config.json, якщо його немає. AutoMap потребує
-   файла-шаблону до запуску гри. Наявний файл init не перезаписує.
-3. Штатний SteamCMD stage 228980 (Common Redistributables) проводить авторизацію
-   AMP. Може завантажити Windows redistributables; це не повна гра.
-4. Helper завантажує Workshop item 3770450698 через той самий SteamCMD, потім
-   копіює DedicatedServer у фізичний `server/`. Stdin закритий,
-   NoPromptForPassword=1, timeout — 2 години.
+1. FetchURL downloads the shell helper from this repository.
+2. Helper init creates data/server-config.json if missing. AutoMap needs this
+   file before the game starts. Init preserves an existing file.
+3. The standard SteamCMD stage for app 228980 (Common Redistributables) handles
+   AMP authentication. It may download Windows redistributables, not the full game.
+4. The helper downloads Workshop item 3770450698 through the same SteamCMD, then
+   copies DedicatedServer into the physical `server/` directory. Stdin is closed,
+   NoPromptForPassword=1, and the timeout is two hours.
 
-Кеш SteamCMD розташований у `../.virtualhome/Steam/config/config.vdf`.
-Це шлях з upstream-шаблону Project Reclaimer; його відповідність вашій
-інсталяції AMP треба перевірити. Пароль/Guard вводяться у штатному діалозі AMP.
+The SteamCMD cache is expected at `../.virtualhome/Steam/config/config.vdf`.
+This path comes from the upstream Project Reclaimer template; confirm that it
+matches your AMP installation. Enter passwords and Guard codes in AMP's dialog.
 
-Окрема копія `server/` дає стабільний executable та WorkingDir без
-динамічного shell-launcher. Вона займає приблизно ще один обсяг dedicated build
-понад Workshop-копію (поточний Workshop — близько 6.5 GB). Перед Update потрібне
-місце для обох копій, Wine prefix на Linux і backup. Helper очищає тільки
-керований `server/` із маркером `.amp-coop-managed`; data/ не очищається.
-Після повного копіювання з'являється `.amp-coop-ready`; без нього Pre-start
-блокується, щоб перерваний Update не запускав частково скопійований engine.
+The separate `server/` copy provides a stable executable and WorkingDir without a
+dynamic shell launcher. It requires roughly one additional dedicated build's
+worth of space beyond the Workshop copy (the observed Workshop download was
+about 6.5 GB). Allow space for both copies, the Wine prefix, and backups before
+Update. The helper clears only the managed `server/` directory marked with
+`.amp-coop-managed`; it does not clear data/. A completed copy receives an
+`.amp-coop-ready` marker. Pre-start refuses to proceed without it, preventing an
+interrupted Update from launching a partially copied engine.
 
-Це схема Login/Workshop Download зі штатного halo3-project-reclaimer.
-Якщо Guard уже OK, але стоїть `app_update 228980 validate`, виконується
-SteamCMD-етап; shell-завантаження Co-op ще не почалося. При тривалій відсутності прогресу
-перевірте Steam content_log.txt. При відсутності reusable cache повторіть
-Update і введіть код Guard у діалозі AMP.
+This follows the Login/Workshop Download pattern in halo3-project-reclaimer.
+If Guard is already OK but the console remains at `app_update 228980 validate`,
+the SteamCMD stage is still running; the helper's Co-op download has not started.
+If progress stalls, check Steam's content_log.txt. If no reusable cache exists,
+retry Update and complete Guard in AMP's dialog.
 
-Update перевіряє підтвердження успішного download і файли bundled engine/.NET.
-Start не оновлює гру автоматично. Main і Workshop mutable: користуйтеся
-перевіреною ревізією та робіть backup. Shell-файл необхідно опублікувати разом
-із шаблоном; інакше FetchURL не спрацює. Генерація шаблону більше не потрібна.
+Update checks for download success confirmation and the bundled engine/.NET
+files. Start does not update the game automatically. Main and Workshop content
+are mutable: use a verified revision and keep backups. Publish the shell helper
+alongside the template so FetchURL can retrieve it. Template generation is no
+longer required.
 
-## Перехід із попереднього шаблону
+## Upgrading an existing template
 
-1. Штатно зупиніть гру й зробіть backup.
-2. Після публікації: ADS → Instance Deployment → **Fetch Latest**.
-3. На плитці Co-op інстансу: права кнопка → **Refresh Configuration**.
-4. Перевірте поля й задайте **Server password** перед Start. Порожнє поле
-   означає відкритий сервер і замінить пароль, який раніше задавали вручну в JSON.
-5. Виконайте Update, потім Stop → Start. Після Start перевірте saveName та
-   autosaveMinutes у data/server-config.json; пароль публікувати не потрібно.
+1. Stop the game normally and create a backup.
+2. After publishing the changes: ADS → Instance Deployment → **Fetch Latest**.
+3. Right-click the Co-op instance tile → **Refresh Configuration**.
+4. Review the fields and set **Server password** before Start. An empty field
+   opens the server and replaces any password previously entered manually in JSON.
+5. Run Update, then Stop → Start. Check saveName and autosaveMinutes in
+   data/server-config.json after Start. Do not publish the password.
 
-Виправлення застосування налаштувань — ConfigVersion 7 і новіші: metaconfig
-посилається на data/server-config.json. Самого Update недостатньо для зміни
-прив'язки — спочатку потрібен Refresh Configuration. Якщо активний metaconfig.json
-інстансу досі містить ConfigFile=settings.json, він ще використовує стару прив'язку.
+ConfigVersion 7 and later fix settings application by mapping metaconfig to
+data/server-config.json. Update alone does not change this mapping: Refresh
+Configuration first. If the instance's active metaconfig.json still contains
+ConfigFile=settings.json, it uses the old mapping.
 
-AppConfigId збережено. Через перейменування файлів конкретна збірка ADS може
-не знайти старий ConfigRoot під час Refresh. У такому разі не видаляйте інстанс:
-потрібна перевірка його прив'язки до template. Цей перехід ще не перевірено на
-реальному AMP. Friendly name наявного інстансу можна змінити окремо.
+AppConfigId is preserved. Because template files were renamed, some ADS builds
+may fail to locate the old ConfigRoot during Refresh. If that happens, keep the
+instance and check its template association. This migration has not been verified
+in a real AMP deployment. You can change an existing instance's friendly name
+separately.
 
-Каталог даних залишається **bannerlord-coop/**: сейви, Wine prefix і кеш не
-переміщуються. ConfigVersion 12 залишає лише Linux і рекомендує Docker.
-Для наявного Linux-інстансу виконайте Refresh Configuration. Нативний Windows-інстанс
-не перетворюється на Linux-інстанс: для перенесення створіть окремий Linux/Docker
-інстанс і імпортуйте кампанію при зупиненій грі.
-Після Refresh обов'язково виконайте Update для створення `server/` перед Start.
-Старий runtime.py новий KVP не використовує.
+The data directory remains **bannerlord-coop/**: saves, the Wine prefix, and the
+cache are not moved. ConfigVersion 12 supports Linux only and recommends Docker.
+Refresh Configuration on an existing Linux instance. A native Windows instance
+cannot become a Linux instance through this change: create a separate Linux/Docker
+instance and import the campaign while the game is stopped.
+Run Update after Refresh to create `server/` before Start.
+The new KVP does not use the old runtime.py.
 
-Підтверджений користувачем module ID — `Coop`, version `v0.1.7`. Він заданий
-у внутрішньому `App.AppSettings.CoopModuleId`, не як поле UI. Pre-start звіряє
-ID із staged SubModule.xml і зупиняється при несумісності. Для іншого build
-потрібна перевірена зміна цього значення у template; мовчазного перейменування
-CoopNightly у Coop чи зміни мод-файлів немає.
+The user-provided installed module ID is `Coop`, version `v0.1.7`. It is set in
+the internal `App.AppSettings.CoopModuleId`, not exposed as a UI field. Pre-start
+compares it with the staged SubModule.xml and stops on a mismatch. A different
+build requires a verified change to this template value. The helper does not
+silently rename CoopNightly to Coop or modify the mod's files.
 
-## Порти й консоль
+## Ports and console
 
-| Allocation | Призначення |
+| Allocation | Purpose |
 | --- | --- |
-| UDP 4200 | Co-op, порт входу гравців |
-| UDP 4201 | Дочірній порт із Offset=1 для dedicated build |
-| UDP 7210 | Engine custom-server, не порт входу гравців |
+| UDP 4200 | Co-op player connection port |
+| UDP 4201 | Child port with Offset=1 for the dedicated build |
+| UDP 7210 | Engine custom-server port, not the player connection port |
 
-AMP передає фактичні GamePort та EnginePort у shell. Другому інстансу потрібні
-власні порти. Офіційна інструкція мода описує один публічний UDP порт, сторонній
-dedicated launcher — пару; потребу відкривати другий/engine порт назовні ще
-треба перевірити. TCP не додано.
+AMP passes the allocated GamePort and EnginePort to the shell helper. A second
+instance needs its own ports. Official mod instructions describe one public UDP
+port; the third-party dedicated launcher uses a pair. Whether the second and
+engine ports need public access still needs verification. No TCP allocation is
+added.
 
-Ready marker: `coop server up, waiting for clients`. Очікувані команди: help,
-status, players, save, stop; звірте з help/@DS@ встановленого build.
-AMP Stop надсилає stop і чекає 180 секунд. Реальне збереження кампанії ще
-потрібно перевірити. Force Stop не гарантує збереження.
+Ready marker: `coop server up, waiting for clients`. Expected commands include
+help, status, players, save, and stop; check help/@DS@ in the installed build.
+AMP Stop sends stop and is configured to wait 180 seconds. Actual campaign
+saving on shutdown still needs verification. Force Stop does not guarantee a save.
 
-Вивід SteamCMD передається без ANSI-фільтрації. Консоль AMP може показувати
-коди кольору/курсора як символи; це не помилка авторизації чи завантаження.
+SteamCMD output is passed through without ANSI filtering. AMP's console may
+show color/cursor escape codes as characters; these alone do not indicate a
+login or download failure.
 
-Pre-start перевіряє конфігурацію/порти/module ID, створює відсутній сейв і
-ініціалізує Wine prefix на Linux, потім повертає керування AMP.
-Linux startup: стандартний `env → xvfb-run → socat EXEC → Wine → bundled dotnet.exe`.
-socat надає PTY із echo=0 та inlcr; EXEC не використовує shell для engine.
-У startup немає викликів нашого .sh. Пароля в командному рядку немає.
+Pre-start validates configuration, ports, and module ID, creates a missing save,
+initializes the Wine prefix, then returns control to AMP.
+Linux startup uses the standard chain
+`env → xvfb-run → socat EXEC → Wine → bundled dotnet.exe`.
+socat provides a PTY with echo=0 and inlcr; EXEC does not use a shell for the
+engine. Startup does not call our .sh helper. The password is absent from the
+command line.
 
-Фізичний WorkingDir — `server/engine/bin/Win64_Shipping_Server`.
-Стандартний env executable задає BANNERLORD_USER_DIR, COOP_DATA_DIR та DOTNET_ROOT
-абсолютними Wine-шляхами Z:/… перед запуском Xvfb. Це не залежить від зміни cwd
-усередині гри. Windows-бінарні файли engine потрібні для Wine й залишаються.
-MonitorChildProcessName прив'язаний до dotnet/Starter та окремого EnginePort.
-Додаткові Workshop-моди поки не підтримуються.
+The physical WorkingDir is `server/engine/bin/Win64_Shipping_Server`.
+The standard env executable sets BANNERLORD_USER_DIR, COOP_DATA_DIR, and DOTNET_ROOT
+to absolute Wine paths Z:/… before launching Xvfb. This does not depend on cwd
+changes inside the game. Windows engine binaries remain necessary for Wine.
+MonitorChildProcessName matches dotnet/Starter and the instance's EnginePort.
+Additional Workshop mods are not supported yet.
 
-## Дані та backup
+## Data and backups
 
-| Шлях від кореня інстансу | Вміст |
+| Path relative to the instance root | Contents |
 | --- | --- |
-| bannerlord-coop/data/Game Saves/ | Сейви .sav і однойменні .json |
-| bannerlord-coop/data/logs/ | Логи мода |
-| bannerlord-coop/data/server-config.json | Налаштування AMP та конфігурація гри, зокрема пароль |
-| bannerlord-coop/server/ | Керована копія executable/engine; Update її замінює |
+| bannerlord-coop/data/Game Saves/ | .sav saves and matching .json files |
+| bannerlord-coop/data/logs/ | Mod logs |
+| bannerlord-coop/data/server-config.json | AMP settings and game configuration, including the password |
+| bannerlord-coop/server/ | Managed executable/engine copy, replaced by Update |
 | bannerlord-coop/.wine/ | Wine prefix |
-| .virtualhome/Steam/ | Linux: приватний кеш Steam і можливі Workshop-файли |
-| bannerlord-coop/workshop/ | Нові Workshop-файли |
-| bannerlord-coop/steam/ | Старе розміщення, якщо вже встановлювали раніше |
+| .virtualhome/Steam/ | Private Linux Steam cache and possible Workshop files |
+| bannerlord-coop/workshop/ | Newly downloaded Workshop files |
+| bannerlord-coop/steam/ | Legacy location, if used by an earlier installation |
 
-Для імпорту кампанії при зупиненій грі перенесіть .sav разом із однойменним
-.json у Game Saves і задайте ім'я без розширення. Наявний сейв не перезаписується.
-Runtime зберігає невідомі поля server-config.json; потрібен JSON без коментарів.
-Некоректний JSON спричиняє помилку без стирання оригіналу.
+To import a campaign, stop the game, copy both the .sav and matching .json into
+Game Saves, and enter the save name without an extension. Existing saves are not
+overwritten by seeding. The helper preserves unknown fields in server-config.json;
+use JSON without comments. Invalid JSON causes an error without erasing the original.
 
-Після Stop, як власник інстансу:
+After Stop, as the instance owner:
 
 ```bash
 read -r -p 'Absolute Co-op AMP instance directory: ' INSTANCE_DIR
@@ -214,14 +227,15 @@ umask 077
 tar -C "$INSTANCE_DIR" -czf "$BACKUP_FILE" bannerlord-coop .virtualhome
 ```
 
-Архів містить токени й паролі. Для відкату зупиніть гру та цей інстанс у ADS,
-перемістіть поточні каталоги в нові поруч і відновіть перевірений backup:
+The archive contains tokens and passwords. To roll back, stop the game and its
+instance in ADS, move the current directories to new sibling locations, and
+restore a verified backup:
 
 ```bash
 test -d "$INSTANCE_DIR/bannerlord-coop" || exit 1
 read -r -p 'Absolute backup archive path: ' BACKUP_FILE
 test -f "$BACKUP_FILE" || exit 1
-tar -tzf "$BACKUP_FILE" # перевірте власний архів
+tar -tzf "$BACKUP_FILE" # Inspect your archive before restoring it.
 mv "$INSTANCE_DIR/bannerlord-coop" "$INSTANCE_DIR/bannerlord-coop.before-rollback-$(date +%Y%m%d-%H%M%S)"
 if [ -d "$INSTANCE_DIR/.virtualhome" ]; then
   mv "$INSTANCE_DIR/.virtualhome" "$INSTANCE_DIR/.virtualhome.before-rollback-$(date +%Y%m%d-%H%M%S)"
@@ -229,42 +243,43 @@ fi
 tar -xzf "$BACKUP_FILE" -C "$INSTANCE_DIR"
 ```
 
-Відновлюйте runtime, template, engine і дані з відповідних ревізій разом.
+Restore the helper, template, engine, and data from matching revisions together.
 
-## Перевірки
+## Validation
 
-Локально потрібні Bash, jq, awk і стандартні Unix tools:
+Local requirements: Bash, jq, awk, and standard Unix tools.
 
 ```bash
 bash tests/test_shell.sh
 ```
 
-На Linux Docker з кореня репозиторію:
+From the repository root on Linux with Docker:
 
 ```bash
 docker run --rm --platform linux/amd64 --entrypoint /bin/bash \
   --mount "type=bind,source=$PWD,target=/work,readonly" -w /work \
   cubecoders/ampbase:wine-stable tests/test_shell.sh
+
 docker run --rm --platform linux/amd64 --entrypoint /bin/bash \
   --mount "type=bind,source=$PWD,target=/work,readonly" -w /work \
   cubecoders/ampbase:wine-stable tests/container_smoke.sh
 ```
 
-Тести перевіряють пароль/JSON, кеш на штучних даних, порти, staging, збереження
-сейву та відсутність запуску гри з Pre-start. Wine smoke запускає Windows cmd
-через той самий xvfb-run/socat ланцюжок і перевіряє шлях до data та stop.
-Це не запуск гри.
+Tests cover password/JSON handling, synthetic cache data, ports, staging, save
+preservation, and ensuring Pre-start returns without launching the game. The
+Wine smoke test runs Windows cmd through the same xvfb-run/socat chain and checks
+the data path and stop input. It does not launch the game.
 
-Для підтвердження роботи Linux/Docker ще потрібно перевірити:
+The following still need verification in Linux/Docker:
 
-- Template видно, Update із реальним Steam Guard/Workshop успішний.
-- Start доходить до справжнього Ready; клієнт підключається.
-- Пароль відхиляє неправильний ввід; зміни AMP читаються грою після Start.
-- Console приймає help/status/save, Stop зберігає й доходить до Stopped.
-- Повторний Start відновлює прогрес і персонажів; Linux контейнер переживає
-  пересоздання з тим самим bind mount.
-- CPU/RAM і process monitoring належать правильному інстансу; другий інстанс
-  не конфліктує портами чи файлами.
+- The template is listed and Update succeeds with real Steam Guard and Workshop.
+- Start reaches the real Ready state and a client can connect.
+- Incorrect passwords are rejected; the game reads AMP changes after Start.
+- Console accepts help/status/save; Stop saves and reaches Stopped.
+- Restart restores progress and characters; recreating the container with the
+  same bind mount preserves data.
+- CPU/RAM and process monitoring belong to the correct instance; a second
+  instance has no port or file conflicts.
 
-Поки ці пункти не виконано, шаблон слід розглядати як draft. Відповідність
-структури та локальні тести не означають приймання CubeCoders.
+Until these checks are complete, treat this template as a draft. Matching the
+structure and passing local tests do not imply acceptance by CubeCoders.
