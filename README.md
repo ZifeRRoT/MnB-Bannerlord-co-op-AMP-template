@@ -99,6 +99,37 @@ Reclaimer; їхню відповідність вашій інсталяції A
 Windows helper показує heartbeat завантаження й друкує SteamCMD-вивід після
 завершення процесу. Пароль/Guard вводяться лише в штатному діалозі AMP.
 
+### Windows: незрозумілий вивід і відсутній Steam cache
+
+На одному реальному Windows AMP 2.8.0.10 введення логіна/пароля не завершилося
+Steam Guard, а штатний SteamCMD-етап показав розсипаний текст. Після цього
+config/config.vdf містив лише початкові дані без Accounts/ConnectCache, тому
+наш helper правильно зупинив Workshop download. Створений config.vdf ще не
+доводить успішний вхід. Точну причину всередині AMP наразі не встановлено.
+
+Окрему копію того самого SteamCMD перевірено з +quit і з анонімним входом:
+код завершення 0, Steam API та Steam Public OK, без binary/environment dump.
+Це звужує проблему до штатного шляху авторизації AMP, але не є перевіркою
+входу в реальний Steam-акаунт.
+
+Разовий обхід — інтерактивний SteamCMD у каталозі **цього** інстансу. У звичайному
+PowerShell, під тим самим Windows-користувачем, що запускає AMP:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\AMPDatastore\Instances\test01\bannerlord-coop\mount-and-blade2-coop.ps1' -Action login
+```
+
+Підставте свій фактичний шлях. У Steam> введіть `login YOUR_STEAM_LOGIN`, пароль
+вводьте лише в password prompt SteamCMD, пройдіть Guard, потім введіть `quit`.
+Пароль не передається в argv і не зберігається helper. SteamCMD сам створює
+кеш у цьому інстансі. Після цього повторіть Update в AMP. Якщо штатний етап
+AMP знову перешкоджає оновленню, наступна діагностика потрібна саме цьому етапу;
+не переносіть кеш інших інстансів і не надсилайте config.vdf у чат.
+
+Для вже встановленого helper без -Action login можна запустити сам
+`steamcmd.exe` з тієї ж папки вручну; команди Steam> такі самі. Цей спосіб є
+тимчасовим обходом, а не підтвердженням виправлення Windows login у AMP.
+
 Окрема копія `server/` дає обом ОС стабільний executable та WorkingDir без
 динамічного shell-launcher. Вона займає приблизно ще один обсяг dedicated build
 понад Workshop-копію (поточний Workshop — близько 6.5 GB). Перед Update потрібне
@@ -274,7 +305,7 @@ docker run --rm --platform linux/amd64 --entrypoint /bin/bash \
 і абсолютного шляху даних. Wine smoke запускає Windows cmd через той самий
 xvfb-run/socat ланцюжок і перевіряє шлях до data та stop. Це не запуск гри.
 
-Локально пройшли 18 Linux shell-перевірок та 23 Windows-перевірки.
+Локально пройшли 18 Linux shell-перевірок та 24 Windows-перевірки.
 Wine smoke повернув WINE_PREFIX_OK та DIRECT_WINE_DATA_PATH_AND_STOP_OK.
 
 До подання в офіційний AMPTemplates на **кожній ОС** ще потрібно підтвердити:

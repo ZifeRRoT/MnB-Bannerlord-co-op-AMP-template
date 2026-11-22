@@ -48,7 +48,14 @@ staging лише в керованому server/, збереження сейв�
 module ID і відсутність запуску гри з Pre-start. Реальна Steam Guard сесія,
 Workshop download і приймання кампанії на обох ОС ще не перевірені.
 
-Пройшли 18 Linux shell-перевірок і 23 перевірки у Windows PowerShell 5.1.
+Пройшли 18 Linux shell-перевірок і 24 перевірки у Windows PowerShell 5.1.
 Нативний Windows console fixture підтвердив абсолютний data path і stop через
 redirected stdin. Wine smoke підтвердив створення prefix, data path і stop через
 той самий env/xvfb-run/socat ланцюжок. Це перевірка механізму, не запуск гри.
+
+22.11.2026: на реальному Windows-інстансі штатний Steam login AMP не створив
+Accounts/ConnectCache після вводу логіна/пароля. Копія його SteamCMD, без кешу
+користувача, успішно виконала +quit і +login anonymous +quit у workspace.
+Точну причину некоректного виводу AMP не встановлено. Додано ручний login action
+без зчитування/зберігання пароля й без автоматичного виклику в Update stages;
+це обхід для діагностики, а не заявлене виправлення нативного AMP login.

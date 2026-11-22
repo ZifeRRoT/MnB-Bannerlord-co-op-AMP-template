@@ -75,6 +75,31 @@ try {
     try { Get-CoopAccounts | Out-Null } catch { $cacheError = $_.Exception.Message }
     Assert-Coop ($null -ne $cacheError -and -not $cacheError.Contains('PRIVATE_TOKEN')) 'Malformed cache errors do not reveal token contents'
 
+    # A failed native AMP login must produce one useful line, not a PowerShell
+    # stack trace or any dump of the private cache contents.
+    [IO.File]::WriteAllText($cachePath, '"InstallConfigStore" { "Software" { } }')
+    $helperPath = Join-Path $script:RootPath 'mount-and-blade2-coop.ps1'
+    Copy-Item -LiteralPath (Join-Path $repoPath 'mount-and-blade2-coop.ps1') -Destination $helperPath
+    $helperInfo = New-Object Diagnostics.ProcessStartInfo
+    $helperInfo.FileName = Join-Path $PSHOME 'powershell.exe'
+    $helperInfo.Arguments = '-NoProfile -ExecutionPolicy Bypass -File "' + $helperPath + '" -Action update'
+    $helperInfo.UseShellExecute = $false
+    $helperInfo.CreateNoWindow = $true
+    $helperInfo.RedirectStandardOutput = $true
+    $helperInfo.RedirectStandardError = $true
+    $helperProcess = New-Object Diagnostics.Process
+    $helperProcess.StartInfo = $helperInfo
+    try {
+        [void]$helperProcess.Start()
+        $helperOut = $helperProcess.StandardOutput.ReadToEndAsync()
+        $helperError = $helperProcess.StandardError.ReadToEndAsync()
+        if (-not $helperProcess.WaitForExit(10000)) { $helperProcess.Kill(); throw 'Helper diagnostic test timed out' }
+        $helperProcess.WaitForExit()
+        $diagnostic = $helperOut.Result + $helperError.Result
+        Assert-Coop ($helperProcess.ExitCode -eq 1 -and $diagnostic.Contains('-Action login') -and
+            -not $diagnostic.Contains('CategoryInfo') -and -not $diagnostic.Contains('PRIVATE_TOKEN')) 'Incomplete Steam sign-in reports a safe actionable error without a stack trace'
+    } finally { $helperProcess.Dispose() }
+
     # This disposable real Windows console exe verifies closed stdin and argument
     # quoting in the native cached SteamCMD process boundary, without any account.
     $fakeExe = Join-Path $script:RootPath 'steamcmd.exe'

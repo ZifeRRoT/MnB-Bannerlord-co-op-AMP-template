@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('init','update','prepare')][string]$Action = 'init',
+    [ValidateSet('init','update','prepare','login')][string]$Action = 'init',
     [int]$GamePort = 4200,
     [int]$EnginePort = 7210,
     [string]$ModuleId = 'Coop'
@@ -88,7 +88,9 @@ function Copy-CoopServer {
 
 function Get-CoopAccounts {
     $cachePath = Join-Path $script:RootPath 'config/config.vdf'
-    if (-not (Test-Path -LiteralPath $cachePath)) { throw 'AMP Steam cache is missing; complete its Steam login dialog' }
+    if (-not (Test-Path -LiteralPath $cachePath)) {
+        throw 'Steam sign-in was not completed by the AMP SteamCMD stage. Complete login/Guard in AMP, or run this helper with -Action login in an interactive PowerShell terminal. No server files were changed.'
+    }
     $cacheText = [IO.File]::ReadAllText($cachePath)
     $cacheTokens = [regex]::Matches($cacheText, '\s+|//[^\r\n]*|"((?:\\.|[^"\\])*)"|([{}])')
     $position = 0; $depth = 0; $accountDepth = 0; $pendingKey = $null; $hasCache = $false
@@ -120,9 +122,27 @@ function Get-CoopAccounts {
         }
     }
     if ($position -ne $cacheText.Length -or $depth -or $null -ne $pendingKey -or -not $hasCache -or -not $names.Count) {
-        throw 'No reusable AMP Steam cache; retry Update with the Steam Guard code'
+        throw 'Steam sign-in has not created a reusable session. Complete login/Guard in AMP, or run this helper with -Action login in an interactive PowerShell terminal. A config.vdf file alone does not mean login succeeded.'
     }
     return @($names.Keys | Sort-Object)
+}
+
+function Invoke-CoopInteractiveLogin {
+    if ([Console]::IsInputRedirected -or [Console]::IsOutputRedirected) {
+        throw 'Manual Steam login requires an interactive PowerShell terminal, not AMP Console or an Update task'
+    }
+    $exePath = Join-Path $script:RootPath 'steamcmd.exe'
+    if (-not (Test-Path -LiteralPath $exePath)) { throw 'SteamCMD is missing; run AMP Update once to install it first' }
+    Write-Host '[coop] At the Steam> prompt enter: login YOUR_STEAM_LOGIN'
+    Write-Host '[coop] Enter the password only at the SteamCMD password prompt, complete Steam Guard, then enter: quit'
+    Write-Host '[coop] This helper does not read or store the password. SteamCMD keeps its token in this instance.'
+    Push-Location -LiteralPath $script:RootPath
+    try {
+        & $exePath
+        if ($LASTEXITCODE -ne 0) { throw 'Interactive SteamCMD exited with an error; check its own logs' }
+        $null = Get-CoopAccounts
+        Write-Host '[coop] Reusable Steam session found. Retry Update in AMP.'
+    } finally { Pop-Location }
 }
 
 function Invoke-CoopSteam([string[]]$SteamArguments, [int]$TimeoutSeconds) {
@@ -204,9 +224,15 @@ function Prepare-CoopServer([int]$Port, [int]$InternalPort, [string]$ExpectedMod
 }
 
 if ($MyInvocation.InvocationName -ne '.') {
-    switch ($Action) {
-        init { $null = Read-CoopConfig }
-        update { Update-CoopWorkshop }
-        prepare { Prepare-CoopServer $GamePort $EnginePort $ModuleId }
+    try {
+        switch ($Action) {
+            init { $null = Read-CoopConfig }
+            update { Update-CoopWorkshop }
+            prepare { Prepare-CoopServer $GamePort $EnginePort $ModuleId }
+            login { Invoke-CoopInteractiveLogin }
+        }
+    } catch {
+        [Console]::Error.WriteLine('[coop] ERROR: ' + $_.Exception.Message)
+        exit 1
     }
 }
