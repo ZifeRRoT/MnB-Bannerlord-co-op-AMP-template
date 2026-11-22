@@ -42,7 +42,11 @@ For local testing, locate your ADS DeploymentTemplates directory using
 As the ADS owner, copy manifest.json and the mount-and-blade2-coop* files into a
 new LOCAL-BannerlordCoop-main subdirectory, add the repository
 LOCAL/BannerlordCoop:main, and fetch it. The helper is still downloaded from the
-AMPTemplates repository CDN. The helper must be available there before Update can fetch it.
+published main branch of this repository.
+
+This standalone repository downloads its helper directly from GitHub so it works
+before the AMPTemplates submission is merged. The separate AMPTemplates PR uses
+the repository CDN, as required by its review rules.
 
 ## Settings
 
@@ -95,7 +99,7 @@ complete Steam login, password, and Guard in AMP's standard dialog.
 
 Update runs four stages:
 
-1. FetchURL downloads the shell helper from the AMPTemplates repository CDN.
+1. FetchURL downloads the shell helper from this repository's published main branch.
 2. Helper init creates data/server-config.json if missing. AutoMap needs this
    file before the game starts. Init preserves an existing file.
 3. The standard SteamCMD stage for app 228980 (Common Redistributables) handles
@@ -124,9 +128,9 @@ If progress stalls, check Steam's content_log.txt. If no reusable cache exists,
 retry Update and complete Guard in AMP's dialog.
 
 Update checks for download success confirmation and the bundled engine/.NET
-files. Start does not update the game automatically. CDN and Workshop content
+files. Start does not update the game automatically. Main and Workshop content
 are mutable: use a verified revision and keep backups. The shell helper must be published
-on the AMPTemplates repository CDN so FetchURL can retrieve it. Template generation is no
+in this repository's main branch so FetchURL can retrieve it. Template generation is no
 longer required.
 
 ## Upgrading an existing template
@@ -288,7 +292,9 @@ the data path and stop input. It does not launch the game.
 The PR bot reported successful Workshop installation (about 6.5 GB), Ready,
 UDP 4200 listening, a world save on clean Stop, and password/save name/autosave/
 Steam flag changes in data/server-config.json after restart. Its test replaced
-the helper URL with the repository CDN URL; this revision includes that change.
+the helper URL with the repository CDN URL; the AMPTemplates PR uses that URL.
+This standalone repository uses its own GitHub raw URL and does not depend on
+the helper being published on the AMPTemplates CDN.
 The report covers the tested build before allocation cleanup. Subsequent local
 tests ran the actual installed build without the engine argument block in a
 Linux Docker volume on Windows: Ready, UDP 4200, shutdown save, and exit code 0
@@ -297,7 +303,7 @@ replace an AMP deployment and monitoring test of this final template revision.
 
 The following still need verification in Linux/Docker:
 
-- Update works once the helper is published on the repository CDN.
+- The AMPTemplates PR's Update works once its helper is published on the repository CDN.
 - A real client can connect and incorrect passwords are rejected.
 - The game uses the configured values; Steam advertising actually works.
 - Console accepts help/status/save; AMP monitoring and lifecycle checks pass

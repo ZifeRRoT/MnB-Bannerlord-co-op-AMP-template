@@ -21,7 +21,7 @@ jq -e 'all(.[]; .FieldName != "steam_username") and
   any(.[]; .FieldName == "AcceptEULA" and .DefaultValue == "false" and .EnumValues.True == "true" and .IncludeInCommandLine == false)' \
   "$REPO/mount-and-blade2-coopconfig.json" >/dev/null
 jq -e 'length == 4 and all(.[]; .UpdateSourcePlatform == "Linux") and
-  .[0].UpdateSourceData == "https://cdn-repo.c7rs.com/AMPTemplates/mount-and-blade2-coop.sh" and
+  .[0].UpdateSourceData == "https://raw.githubusercontent.com/ZifeRRoT/MnB-Bannerlord-co-op-AMP-template/main/mount-and-blade2-coop.sh" and
   any(.[]; .UpdateSourcePlatform == "Linux" and .UpdateSourceData == "/bin/bash") and
   any(.[]; .UpdateSource == "SteamCMD" and .UpdateSourceData == "228980" and .ForceDownloadPlatform == "Windows")' \
   "$REPO/mount-and-blade2-coopupdates.json" >/dev/null

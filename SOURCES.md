@@ -37,8 +37,9 @@ Startup uses the standard env/xvfb-run/socat/Wine executables in Linux Docker;
 no custom scripts are called during startup. Native Windows support was removed
 during private-template development; the new upstream submission starts at ConfigVersion 1. Docker is recommended; running directly on a Linux host
 without a container has not been tested.
-No Python or base64 is used. FetchURL retrieves the helper from the AMPTemplates repository CDN as required
-by review. CDN content is mutable; restore the matching helper from backup
+No Python or base64 is used. This standalone repository retrieves its helper from
+its published GitHub main branch. The separate AMPTemplates PR uses the repository
+CDN as required by review. Both sources are mutable; restore the matching helper from backup
 when reproducing an older deployment. jq reads the password from JSON, not argv.
 
 The user supplied an installed SubModule.xml with Id=Coop, Version=v0.1.7, and
@@ -72,7 +73,7 @@ autosave, and Steam flag changes appeared in data/server-config.json after resta
 Windows was skipped because Meta.OS is Linux. Without previous EULA acceptance,
 the default-disabled acceptance option leaves Start waiting at the console prompt.
 
-This revision applies the CDN URL, repository field order, initial ConfigVersion 1,
+The AMPTemplates PR applies the CDN URL, repository field order, initial ConfigVersion 1,
 release notes, EULA description, and environment cleanup. Only GamePort remains
 externally allocated. An internal CoopEnginePort setting was initially retained,
 then removed after the direct engine tests below. The final template still needs
