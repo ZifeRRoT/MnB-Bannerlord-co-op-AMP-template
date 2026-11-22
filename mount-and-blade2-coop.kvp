@@ -1,6 +1,6 @@
 Meta.DisplayName=Mount & Blade II: Bannerlord Co-op
 Meta.Description=Co-op campaign dedicated server for Linux Docker using Wine. Experimental template.
-Meta.ReleaseNotes=Add AMP player tracking from dedicated server telemetry, including reconnects and a connected-peer metric. Preserve original console output and command input.
+Meta.ReleaseNotes=Use player names for AMP analytics identities and peer IDs for session tracking, so reconnects retain the same analytics identity.
 Meta.OS=Linux
 Meta.Arch=x86_64
 Meta.Author=ZifeRRoT
@@ -16,7 +16,7 @@ Meta.DockerBaseReadOnly=False
 Meta.ContainerPolicy=RecommendedOnLinux
 Meta.ContainerPolicyReason=The AMP Wine image provides Wine, Xvfb, socat and jq. Native Linux requires these dependencies on the host.
 Meta.ExtraContainerPackages=[]
-Meta.ConfigVersion=2
+Meta.ConfigVersion=3
 Meta.AppConfigId=7b025c72-f27d-4fcf-bced-9b4ad2964dac
 App.DisplayName=Mount & Blade II: Bannerlord Co-op
 App.RootDir=./bannerlord-coop/
@@ -47,8 +47,8 @@ App.SteamForceLoginPrompt=True
 App.SupportsUniversalSleep=False
 App.ApplicationReadyMode=RegexMatch
 Console.AppReadyRegex=^.*coop server up, waiting for clients.*$
-Console.UserJoinRegex=^\[AMP-Coop\] join\t(?<userid>peer-\d+)\t(?<username>[^\t\r\n]+)\t(?<endpoint>[^\t\r\n]*)\r*$
-Console.UserLeaveRegex=^\[AMP-Coop\] leave\t(?<userid>peer-\d+)\r*$
+Console.UserJoinRegex=^\[AMP-Coop\] join\t(?<sessionid>peer-\d+)\t(?<username>[^\t\r\n]+)\t(?<endpoint>[^\t\r\n]*)\r*$
+Console.UserLeaveRegex=^\[AMP-Coop\] leave\t(?<sessionid>peer-\d+)\r*$
 Console.MetricsRegex=^.*\[DedicatedServer\] pulse: .*\bplayers=(?<Connected_Peers>\d+)\b.*$
 Console.FilterMatchRegex=
 Console.FilterMatchReplacement=

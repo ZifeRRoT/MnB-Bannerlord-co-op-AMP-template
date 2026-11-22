@@ -51,6 +51,26 @@ the repository CDN, as required by its review rules.
 
 ## Settings
 
+### Configure before the first Start
+
+When creating the instance in ADS, select **After Creation → Do Nothing**.
+For an existing instance, search its settings for **Startup Mode** and choose
+**Do Nothing**. This is AMP Core's `AMP.AppStartupMode`, not a setting in
+GenericModule.kvp. ADS chooses it when provisioning the instance; this template
+does not override that choice.
+
+Open Configuration and set the server password, campaign save, autosave, Steam
+advertising, and EULA option before pressing Start. The first manual Start on an
+uninstalled instance runs Update, requests Steam login/Guard if needed, and then
+starts the game. Steam authentication must finish before the game can be downloaded.
+A manual Update can also request Steam login, but does not itself request a game
+start unless a prior Start operation is still pending.
+
+The automatic **Update and Start Once/Always** creation actions deliberately
+begin this sequence before manual configuration. Changing the startup mode does
+not cancel an operation already in progress; stop the pending operation and
+restart the AMP instance if necessary before beginning manual setup.
+
 | AMP field | Effect |
 | --- | --- |
 | Server password | Masked player password; leave empty to disable password protection |
@@ -156,8 +176,8 @@ in a real AMP deployment. You can change an existing instance's friendly name
 separately.
 
 The data directory remains **bannerlord-coop/**: saves, the Wine prefix, and the
-cache are not moved. This standalone template uses ConfigVersion 2 for player
-tracking and the console bridge. Linux remains the only runtime platform and
+cache are not moved. This standalone template uses ConfigVersion 3 for name-based
+analytics identities with separate peer session IDs. Linux remains the only runtime platform and
 Docker is recommended. Older private versions used a different version sequence;
 refresh existing instances manually rather than relying on automatic detection.
 Refresh Configuration on an existing Linux instance. A native Windows instance
@@ -234,11 +254,19 @@ This bridge belongs to this standalone template; the public template is not chan
   player stays online while their peer remains present in the roster.
 - An explicit disconnect removes the player by peer ID. A later snapshot also
   removes absent peers if a disconnect line was missed. EOF clears the roster.
-- Reconnecting uses the new peer ID. These session IDs are not Steam IDs.
+- AMP uses the player name as its user ID for analytics. Reconnecting with the
+  same name therefore retains the same analytics identity; the changing peer ID
+  is captured separately as sessionid and is used to match disconnects.
 - Identical names receive a stable `[peer N]` suffix when needed because AMP
   GenericModule otherwise deduplicates users by name as well as ID.
 - `Connected Peers` is a separate pulse-derived metric that includes unnamed
   connections still doing a handshake or creating a character.
+
+Names are not account identifiers: renaming starts a separate analytics history,
+and different people using the same name may share a history. The peer suffix
+for simultaneous duplicate names keeps online counts correct but cannot provide
+a stable cross-session identity. Existing analytics stored under old peer-based
+IDs are not automatically merged into the new name-based history.
 
 JSON names are decoded, wrapped snapshots are reassembled, and malformed snapshots
 leave the last valid roster intact. Original output, including ANSI codes, remains

@@ -43,7 +43,7 @@ sed -n 's/^App.EnvironmentVariables=//p' "$REPO/mount-and-blade2-coop.kvp" | jq 
   'has("BANNERLORD_USER_DIR") == false and has("COOP_DATA_DIR") == false and has("DOTNET_ROOT") == false' >/dev/null
 jq -e 'length == 1 and .[0].Ref == "GamePort" and .[0].Port == 4200 and .[0].Protocol == "UDP" and (.[0] | has("ChildPorts") == false)' \
   "$REPO/mount-and-blade2-coopports.json" >/dev/null
-grep -Fx 'Meta.ConfigVersion=2' "$REPO/mount-and-blade2-coop.kvp" >/dev/null
+grep -Fx 'Meta.ConfigVersion=3' "$REPO/mount-and-blade2-coop.kvp" >/dev/null
 grep -E '^Meta.ReleaseNotes=.' "$REPO/mount-and-blade2-coop.kvp" >/dev/null
 sed -n 's/^App.AppSettings=//p' "$REPO/mount-and-blade2-coop.kvp" | jq -e '.CoopModuleId == "Coop" and (has("CoopEnginePort") == false)' >/dev/null
 jq -e '.[0].UpdateSourceArgs | endswith(" prepare {{$GamePort}} {{CoopModuleId}}")' "$REPO/mount-and-blade2-coopstart.json" >/dev/null

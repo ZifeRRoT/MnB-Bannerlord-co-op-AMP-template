@@ -122,3 +122,12 @@ single snapshot without relying on one regex match to process an entire JSON
 array. Original server lines and ANSI codes are preserved. Startup command
 input remains connected to socat/Wine; the adapter only processes output.
 The public AMPTemplates submission is not modified by this change.
+
+ConfigVersion 3 captures the peer field as sessionid rather than userid. In the
+inspected GenericModule implementation, omitting userid makes SimpleUser.Id fall
+back to username, while sessionid remains a separate field usable by the leave
+handler. AnalyticsPlugin stores SimpleUser.Id when user-specific analytics is
+enabled. This groups reconnects with the same name under the same identity,
+without treating a changing peer ID as a permanent account identifier.
+Name changes and duplicate names remain inherently ambiguous; no SteamID is
+inferred and previous analytics records are not rewritten.
